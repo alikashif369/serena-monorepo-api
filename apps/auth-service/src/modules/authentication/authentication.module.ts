@@ -6,7 +6,7 @@ import { AuthenticationController } from './authentication.controller';
 import { PrismaModule } from '@authModules/prisma/prisma.module';
 import { UserModule } from '@authModules/user/user.module';
 import { JwtStrategy } from '@shared-config/authentication/strategy/jwt.strategy';
-import { LocalStrategy } from '@shared-config/authentication/strategy/local.strategy';
+import { LocalStrategy } from './strategies/local.strategy';
 
 @Module({
   imports: [

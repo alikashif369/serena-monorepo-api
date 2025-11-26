@@ -131,8 +131,8 @@ export class AuthenticationService {
 
   getAccessToken(user: any, rememberMe: boolean = false) {
     const payload = {
+      sub: user.id.toString(), // Standard JWT claim for user ID
       email: user.email,
-      id: user.id,
       role: user.role,
     };
 
