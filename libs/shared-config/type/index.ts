@@ -1,0 +1,26 @@
+export type AnyObject = {
+  [key: string]: any;
+};
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface AuthUser {
+  userId: string;
+  email: string;
+  role?: string;
+}

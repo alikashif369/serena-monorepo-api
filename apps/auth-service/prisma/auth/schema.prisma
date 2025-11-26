@@ -1,0 +1,67 @@
+// prisma/auth/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../../node_modules/@notiz/auth"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_AUTH")
+}
+
+model User {
+  id                    Int          @id @default(autoincrement())
+  role                  UserRole     @default(VIEWER)
+  name                  String
+  email                 String       @unique
+  phone                 String?
+  password              String
+  status                UserStatus   @default(Active)
+  emailVerificationCode Int?
+  emailVerified         Boolean      @default(false)
+  fileUrl               String?
+  pfpId                 Int?
+  assignedSites         String[]     @default([]) // Site IDs for SITE_MANAGER role
+  deletedAt             DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  DeviceInfo            DeviceInfo[] @relation("UserDeviceInfo")
+}
+
+model ResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  token     String    @unique
+  isUsed    Boolean   @default(false)
+  expiry    DateTime
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+}
+
+model DeviceInfo {
+  id         Int       @id @default(autoincrement())
+  ipAddress  String
+  deviceInfo String
+  counter    Int       @default(1)
+  status     String    @default("Active")
+  user       User      @relation("UserDeviceInfo", fields: [userId], references: [id])
+  userId     Int
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+  deletedAt  DateTime?
+}
+
+enum UserRole {
+  VIEWER        // Read-only access to maps and data
+  SITE_MANAGER  // Manage vector/raster data for specific hotel sites
+  GIS_ANALYST   // Upload, edit and analyze vector/raster layers across all sites
+  DATA_ADMIN    // Full data management including bulk operations and deletion
+  SYSTEM_ADMIN  // Complete system access including user management
+  SUPER_ADMIN   // Full system access with audit capabilities
+}
+
+enum UserStatus {
+  Active
+  Inactive
+}

@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../../../../node_modules/@notiz/vector"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL_VECTOR")
+  extensions = [postgis]
+}
+
+model VectorLayer {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  
+  // Store GeoJSON as JSONB for better query performance
+  geometry    Json     // GeoJSON geometry object
+  
+  // PostGIS geometry for spatial queries
+  geom        Unsupported("geometry(Geometry,4326)")?  
+  
+  properties  Json?    // Store attributes like site name, classification
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+  
+  userId      String?  // For future auth
+  
+  // Performance indexes
+  @@index([userId])
+  @@index([name])
+  @@index([geom], type: Gist) // Spatial index for geometry queries
+  @@index([deletedAt])
+  
+  @@map("vector_layers")
+}

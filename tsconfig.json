@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@shared-config": ["libs/shared-config/index.ts"],
+      "@shared-config/*": ["libs/shared-config/*"],
+      "@vectorModules/*": ["apps/vector-service/src/modules/*"],
+      "@vectorPrisma/*": ["apps/vector-service/prisma/*"],
+      "@rasterModules/*": ["apps/raster-service/src/modules/*"],
+      "@rasterPrisma/*": ["apps/raster-service/prisma/*"],
+      "@authModules/*": ["apps/auth-service/src/modules/*"],
+      "@authPrisma/*": ["apps/auth-service/prisma/*"]
+    }
+  }
+}
