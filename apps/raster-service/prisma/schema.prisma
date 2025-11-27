@@ -1,0 +1,60 @@
+// Prisma schema for raster-service
+// Datasource: use DATABASE_URL or a dedicated DATABASE_URL_RASTER if provided
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@notiz/raster"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL_RASTER")
+}
+
+model Raster {
+  id               Int       @id @default(autoincrement())
+  // File information
+  fileName         String
+  originalFileName String
+  fileSize         BigInt
+  mimeType         String    @default("image/tiff")
+
+  // Storage location
+  minioUrl         String    @unique
+  minioKey         String
+
+  // Geospatial metadata (basic)
+  bbox             Json
+  crs              String    @default("EPSG:4326")
+  width            Int?
+  height           Int?
+  bandCount        Int       @default(1)
+
+  // Classification data (optional)
+  isClassified     Boolean   @default(false)
+  classifications  Json?
+
+  // Site association
+  siteId           Int?
+  siteName         String?
+
+  // Temporal
+  acquisitionDate  DateTime?
+  uploadDate       DateTime  @default(now())
+
+  // User tracking
+  uploadedById     Int
+
+  // Metadata
+  description      String?
+  tags             String[]  @default([])
+  isActive         Boolean   @default(true)
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([siteId])
+  @@index([uploadedById])
+  @@index([isClassified])
+  @@index([acquisitionDate])
+}

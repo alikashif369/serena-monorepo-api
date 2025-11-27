@@ -14,8 +14,9 @@ export class VectorServiceService {
     const geojsonString = JSON.stringify(geometry);
     
     const layer = await this.prisma.$queryRaw`
-      INSERT INTO vector_layers (name, description, geometry, geom, properties, "userId", "createdAt", "updatedAt")
+      INSERT INTO vector_layers (id, name, description, geometry, geom, properties, "userId", "createdAt", "updatedAt")
       VALUES (
+        gen_random_uuid(),
         ${rest.name},
         ${rest.description || null},
         ${geojsonString}::jsonb,
