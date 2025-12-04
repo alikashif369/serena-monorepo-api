@@ -31,11 +31,24 @@ export class MinioService implements OnModuleInit {
       'Content-Type': 'image/tiff',
       ...(metadata ?? {}),
     });
-    return this.getFileUrl(fileKey);
+    return this.getPermanentUrl(fileKey);
   }
 
-  async getFileUrl(fileKey: string): Promise<string> {
-    return this.minioClient.presignedGetObject(this.bucket, fileKey, 60 * 60 * 24 * 7);
+  /**
+   * Get permanent MinIO URL (no expiration)
+   * Requires bucket to be public or TiTiler to have MinIO credentials
+   */
+  getPermanentUrl(fileKey: string): string {
+    const protocol = minioUseSSL ? 'https' : 'http';
+    return `${protocol}://${minioEndpoint}:${minioPort}/${this.bucket}/${fileKey}`;
+  }
+
+  /**
+   * Get presigned URL (expires after specified time)
+   * Use this only if you need temporary access control
+   */
+  async getPresignedUrl(fileKey: string, expirySeconds = 60 * 60 * 24 * 7): Promise<string> {
+    return this.minioClient.presignedGetObject(this.bucket, fileKey, expirySeconds);
   }
 
   async deleteFile(fileKey: string): Promise<void> {

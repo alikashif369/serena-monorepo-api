@@ -71,6 +71,11 @@ export class RasterServiceService {
 
       console.log('Raster saved to database:', raster.id);
       
+      // Extract geographic metadata asynchronously (don't block response)
+      this.extractCogMetadata(raster.id, minioUrl).catch(err => 
+        console.error(`Failed to extract metadata for raster ${raster.id}:`, err)
+      );
+      
       // Convert BigInt to string for JSON serialization
       return {
         ...raster,
@@ -104,13 +109,64 @@ export class RasterServiceService {
 
   async getTile(rasterId: number, z: number, x: number, y: number) {
     const raster = await this.findOne(rasterId);
+    // Use the permanent MinIO URL stored in database (no expiration)
     const cogUrl = encodeURIComponent(raster.minioUrl);
-    return `${titilerUrl}/cog/tiles/${z}/${x}/${y}.png?url=${cogUrl}`;
+    const url = `${titilerUrl}/cog/tiles/WebMercatorQuad/${z}/${x}/${y}.png?url=${cogUrl}`;
+    console.log(
+      `[Tiles] Building TiTiler URL`,
+      JSON.stringify({ rasterId, z, x, y, titilerUrl, minioUrl: raster.minioUrl, url })
+    );
+    return url;
   }
 
   async remove(id: number) {
     const raster = await this.findOne(id);
     await this.minio.deleteFile(raster.minioKey);
     return this.prisma.raster.update({ where: { id }, data: { isActive: false } });
+  }
+
+  /**
+   * Extract geographic metadata from COG using TiTiler
+   * This populates bbox, crs, width, height, bandCount automatically
+   * Runs asynchronously after upload - not blocking user response
+   */
+  private async extractCogMetadata(rasterId: number, minioUrl: string) {
+    try {
+      const infoUrl = `${titilerUrl}/cog/info?url=${encodeURIComponent(minioUrl)}`;
+      const response = await fetch(infoUrl);
+      
+      if (!response.ok) {
+        console.error(`TiTiler returned ${response.status} for raster ${rasterId}`);
+        return;
+      }
+      
+      const info = await response.json();
+      
+      // Update database with geographic metadata
+      await this.prisma.raster.update({
+        where: { id: rasterId },
+        data: {
+          bbox: {
+            type: 'Polygon',
+            coordinates: [[
+              [info.bounds[0], info.bounds[1]], // bottom-left
+              [info.bounds[2], info.bounds[1]], // bottom-right
+              [info.bounds[2], info.bounds[3]], // top-right
+              [info.bounds[0], info.bounds[3]], // top-left
+              [info.bounds[0], info.bounds[1]], // close polygon
+            ]]
+          },
+          crs: info.crs || 'EPSG:4326',
+          width: info.width,
+          height: info.height,
+          bandCount: info.count,
+        }
+      });
+      
+      console.log(`✅ Extracted metadata for raster ${rasterId}: bounds=${info.bounds}, crs=${info.crs}`);
+    } catch (error) {
+      console.error(`❌ Failed to extract metadata for raster ${rasterId}:`, error.message);
+      // Don't throw - this is optional enhancement, shouldn't fail the upload
+    }
   }
 }

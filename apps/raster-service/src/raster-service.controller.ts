@@ -93,11 +93,24 @@ export class RasterServiceController {
     @Res() res: Response,
   ) {
     const tileUrl = await this.rasterService.getTile(Number(id), Number(z), Number(x), Number(y));
-    const response = await fetch(tileUrl);
-    if (!response.ok) return res.status(response.status).send('Tile not found');
-    const buffer = await response.arrayBuffer();
-    res.set('Content-Type', 'image/png');
-    res.send(Buffer.from(buffer));
+    console.log('[Tiles] Proxying request to TiTiler', tileUrl);
+    try {
+      const response = await fetch(tileUrl);
+      console.log('[Tiles] TiTiler response', { status: response.status, ok: response.ok });
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[Tiles] TiTiler error body', text);
+        res.status(response.status).send(text);
+        return;
+      }
+      const buffer = await response.arrayBuffer();
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.send(Buffer.from(buffer));
+    } catch (err: any) {
+      console.error('[Tiles] Proxy error', err?.message || err);
+      res.status(500).send('Tile proxy failed');
+    }
   }
 
   @Delete(':id')
