@@ -24,12 +24,10 @@
     "paths": {
       "@shared-config": ["libs/shared-config/index.ts"],
       "@shared-config/*": ["libs/shared-config/*"],
-      "@vectorModules/*": ["apps/vector-service/src/modules/*"],
-      "@vectorPrisma/*": ["apps/vector-service/prisma/*"],
-      "@rasterModules/*": ["apps/raster-service/src/modules/*"],
-      "@rasterPrisma/*": ["apps/raster-service/prisma/*"],
-      "@authModules/*": ["apps/auth-service/src/modules/*"],
-      "@authPrisma/*": ["apps/auth-service/prisma/*"]
+      "@app/shared-config/*": ["libs/shared-config/*"],
+      "@common/*": ["apps/api/src/common/*"],
+      "@modules/*": ["apps/api/src/modules/*"],
+      "@config/*": ["apps/api/src/config/*"]
     }
   }
 }

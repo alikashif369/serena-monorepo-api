@@ -25,14 +25,20 @@ export const minioEndpoint = process.env.MINIO_ENDPOINT || 'localhost';
 export const minioPort = process.env.MINIO_PORT || '9000';
 export const minioAccessKey = process.env.MINIO_ACCESS_KEY || 'minioadmin';
 export const minioSecretKey = process.env.MINIO_SECRET_KEY || 'minioadmin';
-export const minioBucket = process.env.MINIO_BUCKET || 'serena-rasters';
+export const minioBucket = process.env.MINIO_BUCKET || 'serena-rasters'; // Legacy
 export const minioUseSSL = process.env.MINIO_USE_SSL === 'true';
+
+// MinIO Buckets (Multi-bucket architecture)
+export const minioBucketRastersBase = process.env.MINIO_BUCKET_RASTERS_BASE || 'serena-rasters-base';
+export const minioBucketRastersClassified = process.env.MINIO_BUCKET_RASTERS_CLASSIFIED || 'serena-rasters-classified';
+export const minioBucketPhotos = process.env.MINIO_BUCKET_PHOTOS || 'serena-photos';
 
 // TiTiler Configuration
 export const titilerUrl = process.env.TITILER_URL || 'http://localhost:8000';
 
 // Upload Configuration
 export const maxRasterUploadSizeMB = process.env.MAX_RASTER_UPLOAD_SIZE_MB || '2048';
+export const maxPhotoUploadSizeMB = process.env.MAX_PHOTO_UPLOAD_SIZE_MB || '50';
 
 // Raster Service Auth/Access Flags
 export const rasterPublicList = process.env.RASTER_PUBLIC_LIST !== 'false';

@@ -1,38 +1,21 @@
 {
-  "$schema": "https://json.schemastore.org/nest-cli",
+  "$schema": "https://raw.githubusercontent.com/nestjs/schematics/master/src/nest-cli-schema.json",
   "collection": "@nestjs/schematics",
-  "monorepo": true,
-  "root": "apps",
-  "sourceRoot": "apps",
+  "sourceRoot": "apps/api/src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "tsConfigPath": "apps/api/tsconfig.app.json"
   },
+  "monorepo": true,
+  "root": "apps/api",
   "projects": {
-    "vector-service": {
+    "api": {
       "type": "application",
-      "root": "apps/vector-service",
+      "root": "apps/api",
       "entryFile": "main",
-      "sourceRoot": "apps/vector-service/src",
+      "sourceRoot": "apps/api/src",
       "compilerOptions": {
-        "tsConfigPath": "apps/vector-service/tsconfig.app.json"
-      }
-    },
-    "raster-service": {
-      "type": "application",
-      "root": "apps/raster-service",
-      "entryFile": "main",
-      "sourceRoot": "apps/raster-service/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/raster-service/tsconfig.app.json"
-      }
-    },
-    "auth-service": {
-      "type": "application",
-      "root": "apps/auth-service",
-      "entryFile": "main",
-      "sourceRoot": "apps/auth-service/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/auth-service/tsconfig.app.json"
+        "tsConfigPath": "apps/api/tsconfig.app.json"
       }
     }
   }

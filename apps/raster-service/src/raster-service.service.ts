@@ -33,17 +33,34 @@ export class RasterServiceService {
       }
 
       const timestamp = Date.now();
-      const safeSite = (dto.siteName ?? 'unknown').replace(/\s+/g, '_');
-      const fileKey = `${safeSite}_${timestamp}_${file.originalname}`;
+      const safeSite = (dto.siteName ?? 'unknown').replace(/\s+/g, '-').toLowerCase();
+      const year = dto.acquisitionDate ? new Date(dto.acquisitionDate).getFullYear() : new Date().getFullYear();
+      const category = dto.isClassified ? 'classified' : 'base';
+      
+      // Hierarchical file key: sites/{slug}/{year}/{filename}
+      const fileKey = `sites/${safeSite}/${year}/${safeSite}_${category}_${year}_${timestamp}.tif`;
 
-      console.log('Uploading to MinIO:', { bucket: 'serena-rasters', fileKey, size: file.size });
-
-      const minioUrl = await this.minio.uploadFile(fileKey, file.buffer, {
-        'original-name': file.originalname,
-        'uploaded-by': String(userId),
+      console.log('Uploading to MinIO:', { 
+        isClassified: dto.isClassified,
+        bucket: dto.isClassified ? 'serena-rasters-classified' : 'serena-rasters-base',
+        fileKey, 
+        size: file.size 
       });
 
-      console.log('MinIO upload successful, presigned URL:', minioUrl);
+      // Upload to correct bucket based on classification status
+      const minioUrl = await this.minio.uploadRaster(
+        fileKey, 
+        file.buffer, 
+        dto.isClassified ?? false,
+        {
+          'original-name': file.originalname,
+          'uploaded-by': String(userId),
+          'site-id': String(dto.siteId),
+          'year': String(year),
+        }
+      );
+
+      console.log('MinIO upload successful, URL:', minioUrl);
 
       const raster = await this.prisma.raster.create({
         data: {
