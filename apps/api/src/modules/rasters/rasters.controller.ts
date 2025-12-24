@@ -76,6 +76,15 @@ export class RastersController {
     });
   }
 
+  @Post(':id/refresh-metadata')
+  @ApiOperation({ summary: 'Refresh raster metadata from TiTiler' })
+  @ApiParam({ name: 'id', description: 'Raster ID', type: Number })
+  @ApiResponse({ status: 200, description: 'Metadata refreshed successfully' })
+  @ApiResponse({ status: 404, description: 'Raster not found' })
+  async refreshMetadata(@Param('id') id: string) {
+    return this.rastersService.refreshMetadata(parseInt(id));
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete raster' })
   @ApiParam({ name: 'id', description: 'Raster ID', type: Number })

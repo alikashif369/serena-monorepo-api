@@ -256,16 +256,35 @@ export class RastersService {
     console.log('✅ Found raster:', { id: raster.id, minioUrl: raster.minioUrl });
 
     // Build MinIO URL that TiTiler can access
-    // raster.minioUrl format: http://127.0.0.1:9000/bucket-name/path/to/file.tif
-    // Extract just the bucket and key path from the full URL
-    const urlParts = new URL(raster.minioUrl);
-    const pathWithoutLeadingSlash = urlParts.pathname.substring(1); // Remove leading /
-    const minioUrl = `http://${minioEndpoint}:${minioPort}/${pathWithoutLeadingSlash}`;
+    // Handle both formats:
+    // - Full URL: http://127.0.0.1:9000/bucket-name/path/to/file.tif
+    // - Relative path (legacy): /minio/sites/... or /bucket/path/file.tif
+    let minioUrl: string;
+
+    if (raster.minioUrl.startsWith('http://') || raster.minioUrl.startsWith('https://')) {
+      // Full URL format - extract path and rebuild with configured endpoint
+      const urlParts = new URL(raster.minioUrl);
+      const pathWithoutLeadingSlash = urlParts.pathname.substring(1); // Remove leading /
+      minioUrl = `http://${minioEndpoint}:${minioPort}/${pathWithoutLeadingSlash}`;
+    } else {
+      // Relative path format (legacy data) - prepend MinIO endpoint
+      // Remove leading slash and any /minio prefix if present
+      let path = raster.minioUrl;
+      if (path.startsWith('/')) path = path.substring(1);
+      if (path.startsWith('minio/')) path = path.substring(6);
+      minioUrl = `http://${minioEndpoint}:${minioPort}/${path}`;
+    }
     
     // Build TiTiler tile URL
     // TiTiler v0.18+ format: /cog/tiles/{TileMatrixSetId}/{z}/{x}/{y}[@{scale}x][.{format}]
     // Use WebMercatorQuad to reproject from any CRS to Web Mercator (EPSG:3857)
-    const tileUrl = `${titilerUrl}/cog/tiles/WebMercatorQuad/${z}/${x}/${y}.png?url=${encodeURIComponent(minioUrl)}`;
+    // Parameters:
+    // - bidx=1&bidx=2&bidx=3: Select bands 1,2,3 as RGB (many COGs have undefined colorinterp)
+    // - rescale=0,255: Scale values to 0-255 range for proper display
+    // - minzoom=0&maxzoom=24: Override zoom constraints to allow tiles at any zoom level
+    // - resampling_method=bilinear: Better quality when zooming/reprojecting
+    // - return_mask=true: Handle nodata values properly (uses band 4 as alpha if present)
+    const tileUrl = `${titilerUrl}/cog/tiles/WebMercatorQuad/${z}/${x}/${y}.png?url=${encodeURIComponent(minioUrl)}&bidx=1&bidx=2&bidx=3&rescale=0,255&minzoom=0&maxzoom=24&resampling_method=bilinear&return_mask=true`;
     
     console.log('🗺️ Tile request:', { rasterId: id, z, x, y });
     console.log('📍 MinIO URL:', minioUrl);
@@ -283,14 +302,24 @@ export class RastersService {
         console.warn('❌ TiTiler initial error response:', response.status, errorText);
 
         try {
-          const srcUrl = new URL(raster.minioUrl);
-          const parts = srcUrl.pathname.split('/').filter(Boolean);
-          const bucket = parts[0];
-          const key = parts.slice(1).join('/');
+          // Extract bucket and key from either full URL or relative path
+          let pathParts: string[];
+          if (raster.minioUrl.startsWith('http://') || raster.minioUrl.startsWith('https://')) {
+            const srcUrl = new URL(raster.minioUrl);
+            pathParts = srcUrl.pathname.split('/').filter(Boolean);
+          } else {
+            // Relative path - remove leading slash and /minio prefix
+            let path = raster.minioUrl;
+            if (path.startsWith('/')) path = path.substring(1);
+            if (path.startsWith('minio/')) path = path.substring(6);
+            pathParts = path.split('/').filter(Boolean);
+          }
+          const bucket = pathParts[0];
+          const key = pathParts.slice(1).join('/');
 
           // Generate presigned URL valid for 1 hour
           const presigned = await this.minio.getPresignedUrl(bucket, key, 3600);
-          const tileUrl2 = `${titilerUrl}/cog/tiles/WebMercatorQuad/${z}/${x}/${y}.png?url=${encodeURIComponent(presigned)}`;
+          const tileUrl2 = `${titilerUrl}/cog/tiles/WebMercatorQuad/${z}/${x}/${y}.png?url=${encodeURIComponent(presigned)}&bidx=1&bidx=2&bidx=3&rescale=0,255&minzoom=0&maxzoom=24&resampling_method=bilinear&return_mask=true`;
           console.log('🔁 Retrying TiTiler with presigned URL', tileUrl2);
 
           const resp2 = await fetch(tileUrl2);
@@ -325,6 +354,92 @@ export class RastersService {
       throw new NotFoundException(
         `Failed to fetch tile: ${error.message}. Ensure TiTiler is running at ${titilerUrl} and can access MinIO at ${minioUrl}`
       );
+    }
+  }
+
+  async refreshMetadata(id: number) {
+    const raster = await this.prisma.raster.findUnique({
+      where: { id },
+    });
+
+    if (!raster) {
+      throw new NotFoundException(`Raster with ID ${id} not found`);
+    }
+
+    // Build MinIO URL for TiTiler
+    // Handle both full URL and relative path formats
+    let minioUrl: string;
+    if (raster.minioUrl.startsWith('http://') || raster.minioUrl.startsWith('https://')) {
+      const urlParts = new URL(raster.minioUrl);
+      const pathWithoutLeadingSlash = urlParts.pathname.substring(1);
+      minioUrl = `http://${minioEndpoint}:${minioPort}/${pathWithoutLeadingSlash}`;
+    } else {
+      let path = raster.minioUrl;
+      if (path.startsWith('/')) path = path.substring(1);
+      if (path.startsWith('minio/')) path = path.substring(6);
+      minioUrl = `http://${minioEndpoint}:${minioPort}/${path}`;
+    }
+
+    try {
+      // Fetch metadata from TiTiler's info endpoint
+      const infoUrl = `${titilerUrl}/cog/info?url=${encodeURIComponent(minioUrl)}`;
+      console.log('Fetching metadata from TiTiler:', infoUrl);
+
+      const response = await fetch(infoUrl);
+
+      if (!response.ok) {
+        throw new NotFoundException(`TiTiler could not access the raster file: ${response.statusText}`);
+      }
+
+      const info = await response.json();
+      console.log('TiTiler metadata:', info);
+
+      // Fetch bounds in Web Mercator projection
+      const boundsUrl = `${titilerUrl}/cog/WebMercatorQuad/tilejson.json?url=${encodeURIComponent(minioUrl)}`;
+      const boundsResponse = await fetch(boundsUrl);
+
+      if (!boundsResponse.ok) {
+        throw new NotFoundException(`TiTiler could not generate bounds: ${boundsResponse.statusText}`);
+      }
+
+      const tileJson = await boundsResponse.json();
+      const bounds = tileJson.bounds; // [minLon, minLat, maxLon, maxLat] in WGS84
+      const center = tileJson.center; // [lon, lat, zoom] from TiTiler
+
+      // Update raster record with metadata
+      const updatedRaster = await this.prisma.raster.update({
+        where: { id },
+        data: {
+          width: info.width || null,
+          height: info.height || null,
+          bandCount: info.count || null,
+          crs: info.crs ? info.crs.replace('http://www.opengis.net/def/crs/EPSG/0/', 'EPSG:') : null,
+          bbox: bounds ? {
+            type: 'Polygon',
+            coordinates: [[
+              [bounds[0], bounds[1]], // minLon, minLat
+              [bounds[2], bounds[1]], // maxLon, minLat
+              [bounds[2], bounds[3]], // maxLon, maxLat
+              [bounds[0], bounds[3]], // minLon, maxLat
+              [bounds[0], bounds[1]], // close polygon
+            ]]
+          } as any : Prisma.JsonNull,
+          center: center ? {
+            lon: center[0],
+            lat: center[1],
+            zoom: center[2]
+          } as any : Prisma.JsonNull,
+        },
+      });
+
+      return {
+        ...updatedRaster,
+        fileSize: updatedRaster.fileSize.toString(),
+        message: 'Metadata refreshed successfully',
+      };
+    } catch (error) {
+      console.error('Failed to refresh metadata:', error);
+      throw new NotFoundException(`Failed to refresh metadata: ${error.message}`);
     }
   }
 

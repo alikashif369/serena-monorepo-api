@@ -17,29 +17,31 @@ datasource db {
 // ============================================================================
 
 model User {
-  id                       Int           @id @default(autoincrement())
-  email                    String        @unique
-  password                 String
-  name                     String
-  role                     UserRole      @default(VIEWER)
-  status                   UserStatus    @default(ACTIVE)
-  phone                    String?
-  emailVerificationCode    String?
-  emailVerified            Boolean       @default(false)
-  pfpId                    String?
-  fileUrl                  String?
-  assignedSites            Int[]         @default([])
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
-  deletedAt                DateTime?
+  id                    Int        @id @default(autoincrement())
+  email                 String     @unique
+  password              String
+  name                  String
+  role                  UserRole   @default(VIEWER)
+  status                UserStatus @default(ACTIVE)
+  phone                 String?
+  emailVerificationCode String?
+  emailVerified         Boolean    @default(false)
+  pfpId                 String?
+  fileUrl               String?
+  assignedSites         Int[]      @default([])
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  deletedAt             DateTime?
 
   resetTokens              ResetToken[]
   deviceInfo               DeviceInfo[]
-  uploadedRasters          Raster[]      @relation("uploadedBy")
-  uploadedPhotos           Photo[]       @relation("uploadedPhotos")
+  uploadedRasters          Raster[]           @relation("uploadedBy")
+  uploadedPhotos           Photo[]            @relation("uploadedPhotos")
+  updatedAggregateMetrics  AggregateMetrics[]
+  updatedCategorySummaries CategorySummary[]
 
-  @@schema("auth")
   @@map("users")
+  @@schema("auth")
 }
 
 model ResetToken {
@@ -53,24 +55,24 @@ model ResetToken {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  @@schema("auth")
   @@map("reset_tokens")
+  @@schema("auth")
 }
 
 model DeviceInfo {
-  id        Int       @id @default(autoincrement())
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress String?
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress  String?
   deviceInfo String?
-  counter   Int       @default(0)
-  status    String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  counter    Int       @default(0)
+  status     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
 
-  @@schema("auth")
   @@map("device_info")
+  @@schema("auth")
 }
 
 enum UserRole {
@@ -95,6 +97,43 @@ enum UserStatus {
 // CORE SCHEMA - Hierarchical site structure, metrics, and reference data
 // ============================================================================
 
+enum EntityType {
+  ORGANIZATION
+  REGION
+  CATEGORY
+
+  @@schema("core")
+}
+
+enum MetricType {
+  // Plantation
+  PLANTATION_TARGET
+  PLANTATION_ACHIEVED
+  PLANTATION_STEWARDSHIP_TARGET
+  PLANTATION_STEWARDSHIP_ACHIEVED
+
+  // Solar
+  SOLAR_CAPACITY_TOTAL
+  SOLAR_PRODUCTION_ANNUAL
+  SOLAR_PRODUCTION_CUMULATIVE
+
+  // Community
+  COMMUNITY_STOVES
+  COMMUNITY_SEEDS_FODDER
+  COMMUNITY_SEEDS_KITCHEN
+  COMMUNITY_SOLAR_GEYSERS
+
+  // Waste & Sewage
+  WASTE_ORGANIC_TOTAL
+  WASTE_COMPOST_TOTAL
+  SEWAGE_RECOVERY_TOTAL
+
+  // Custom (fallback for truly unknown types)
+  CUSTOM
+
+  @@schema("core")
+}
+
 model Organization {
   id          Int       @id @default(autoincrement())
   name        String
@@ -104,46 +143,52 @@ model Organization {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  regions     Region[]
+  regions           Region[]
+  aggregateMetrics  AggregateMetrics[]
+  categorySummaries CategorySummary[]
 
-  @@schema("core")
   @@map("organizations")
+  @@schema("core")
 }
 
 model Region {
-  id             Int       @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   name           String
   slug           String
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
 
-  categories     Category[]
+  categories        Category[]
+  aggregateMetrics  AggregateMetrics[]
+  categorySummaries CategorySummary[]
 
   @@unique([organizationId, slug])
-  @@schema("core")
   @@map("regions")
+  @@schema("core")
 }
 
 model Category {
-  id        Int            @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   name      String
   slug      String
   type      CategoryType
   regionId  Int
-  region    Region         @relation(fields: [regionId], references: [id], onDelete: Cascade)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  region    Region       @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
   deletedAt DateTime?
 
-  subCategories  SubCategory[]
-  sites          Site[]
+  subCategories     SubCategory[]
+  sites             Site[]
+  aggregateMetrics  AggregateMetrics[]
+  categorySummaries CategorySummary[]
 
   @@unique([regionId, slug])
-  @@schema("core")
   @@map("categories")
+  @@schema("core")
 }
 
 enum CategoryType {
@@ -167,52 +212,52 @@ model SubCategory {
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
-  sites      Site[]
+  sites Site[]
 
   @@unique([categoryId, slug])
-  @@schema("core")
   @@map("sub_categories")
+  @@schema("core")
 }
 
 model Site {
-  id              Int          @id @default(autoincrement())
-  name            String
-  slug            String
-  categoryId      Int
-  category        Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  subCategoryId   Int?
-  subCategory     SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  id            Int          @id @default(autoincrement())
+  name          String
+  slug          String
+  categoryId    Int
+  category      Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subCategoryId Int?
+  subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
 
   // Geographic data
-  district        String?
-  city            String?
-  area            Float?
-  coordinates     Json?        // {lat, lng, zoom}
+  district    String?
+  city        String?
+  area        Float?
+  coordinates Json? // {lat, lng, zoom}
 
   // Site metadata
-  siteType        SiteType
-  infrastructure  String?
+  siteType       SiteType
+  infrastructure String?
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  yearlyMetrics   YearlyMetrics[]
-  siteBoundaries  SiteBoundary[]
-  rasters         Raster[]
-  photos          Photo[]
-  species         SitesSpecies[]
-  plantationData  PlantationData?
-  solarData       SolarData?
-  wasteData       WasteData[]
-  sewageData      SewageData[]
+  yearlyMetrics  YearlyMetrics[]
+  siteBoundaries SiteBoundary[]
+  rasters        Raster[]
+  photos         Photo[]
+  species        SitesSpecies[]
+  plantationData PlantationData?
+  solarData      SolarData?
+  wasteData      WasteData[]
+  sewageData     SewageData[]
 
   @@unique([categoryId, slug])
   @@index([categoryId])
   @@index([subCategoryId])
   @@index([siteType])
-  @@schema("core")
   @@map("sites")
+  @@schema("core")
 }
 
 enum SiteType {
@@ -228,93 +273,172 @@ enum SiteType {
 }
 
 model YearlyMetrics {
-  id                    Int       @id @default(autoincrement())
-  siteId                Int
-  site                  Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  year                  Int
+  id     Int  @id @default(autoincrement())
+  siteId Int
+  site   Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  year   Int
 
   // Land cover percentages
-  treeCanopy            Float?
-  greenArea             Float?
-  barrenLand            Float?
-  wetLand               Float?
-  snow                  Float?
-  rock                  Float?
-  water                 Float?
-  buildup               Float?
-  solarPanels           Float?
+  treeCanopy  Float?
+  greenArea   Float?
+  barrenLand  Float?
+  wetLand     Float?
+  snow        Float?
+  rock        Float?
+  water       Float?
+  buildup     Float?
+  solarPanels Float?
 
   // Links to rasters
-  baseRasterId          Int?
-  baseRaster            Raster?   @relation("baseRasterMetrics", fields: [baseRasterId], references: [id], onDelete: SetNull)
-  classifiedRasterId    Int?
-  classifiedRaster      Raster?   @relation("classifiedRasterMetrics", fields: [classifiedRasterId], references: [id], onDelete: SetNull)
+  baseRasterId       Int?
+  baseRaster         Raster? @relation("baseRasterMetrics", fields: [baseRasterId], references: [id], onDelete: SetNull)
+  classifiedRasterId Int?
+  classifiedRaster   Raster? @relation("classifiedRasterMetrics", fields: [classifiedRasterId], references: [id], onDelete: SetNull)
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([siteId, year])
   @@index([siteId, year])
-  @@schema("core")
   @@map("yearly_metrics")
+  @@schema("core")
 }
 
 model PlantationData {
-  id        Int       @id @default(autoincrement())
-  siteId    Int       @unique
-  site      Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  siteId    Int      @unique
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   plants    Int
-  species   String[]  // Array of species codes
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  species   String[] // Array of species codes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@schema("core")
   @@map("plantation_data")
+  @@schema("core")
 }
 
 model SolarData {
-  id                  Int       @id @default(autoincrement())
-  siteId              Int       @unique
-  site                Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  id                  Int      @id @default(autoincrement())
+  siteId              Int      @unique
+  site                Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   installationYear    Int
   capacityKwh         Float
-  quarterlyProduction Json      // {Q1_2022: 100, Q2_2022: 150, ...}
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  quarterlyProduction Json // {Q1_2022: 100, Q2_2022: 150, ...}
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  @@schema("core")
   @@map("solar_data")
+  @@schema("core")
 }
 
 model WasteData {
-  id              Int       @id @default(autoincrement())
-  siteId          Int
-  site            Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  year            Int
-  organicWaste    Float
-  compostReceived Float
+  id               Int      @id @default(autoincrement())
+  siteId           Int
+  site             Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  year             Int
+  organicWaste     Float
+  compostReceived  Float
   methaneRecovered Float?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([siteId, year])
-  @@schema("core")
   @@map("waste_data")
+  @@schema("core")
 }
 
 model SewageData {
-  id              Int       @id @default(autoincrement())
-  siteId          Int
-  site            Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  year            Int
-  recoveryRatio   Float
-  methaneSaved    Float
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            Int      @id @default(autoincrement())
+  siteId        Int
+  site          Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  year          Int
+  recoveryRatio Float
+  methaneSaved  Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@unique([siteId, year])
-  @@schema("core")
   @@map("sewage_data")
+  @@schema("core")
+}
+
+// Aggregate Metrics - Category/Region/Organization level summaries
+model AggregateMetrics {
+  id Int @id @default(autoincrement())
+
+  // Hierarchy linkage (ONE of these is set)
+  entityType     EntityType
+  organizationId Int?
+  regionId       Int?
+  categoryId     Int?
+
+  // Relations
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  region       Region?       @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  // Metric identification
+  metricType MetricType
+
+  // Time period
+  startYear Int?
+  endYear   Int?
+  year      Int?
+
+  // Structured fields for common metrics
+  targetValue   Float?
+  achievedValue Float?
+  unit          String?
+
+  // Flexible JSON for type-specific details
+  details Json?
+
+  // Display
+  label        String
+  description  String? @db.Text
+  displayOrder Int     @default(0)
+
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedById Int?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+
+  @@unique([entityType, organizationId, regionId, categoryId, metricType, startYear, endYear, year])
+  @@index([categoryId, metricType])
+  @@index([regionId, metricType])
+  @@index([organizationId, metricType])
+  @@map("aggregate_metrics")
+  @@schema("core")
+}
+
+// Category Summaries - Long-form text descriptions
+model CategorySummary {
+  id Int @id @default(autoincrement())
+
+  // Hierarchy linkage
+  organizationId Int?
+  regionId       Int?
+  categoryId     Int?
+
+  // Relations
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  region       Region?       @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  // Content
+  title        String?
+  summary      String  @db.Text
+  displayOrder Int     @default(0)
+
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedById Int?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
+
+  @@map("category_summaries")
+  @@schema("core")
 }
 
 // Species model moved to end of file (after Raster model)
@@ -324,173 +448,174 @@ model SewageData {
 // ============================================================================
 
 model SiteBoundary {
-  id          String    @id @default(cuid())
-  siteId      Int
-  site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  year        Int
+  id     String @id @default(cuid())
+  siteId Int
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  year   Int
 
-  geometry    Json      // GeoJSON FeatureCollection
-  geom        Unsupported("geometry(Geometry,4326)")?   // PostGIS geometry type with SRID 4326
-  properties  Json?
+  geometry   Json // GeoJSON FeatureCollection
+  geom       Unsupported("geometry(Geometry,4326)")? // PostGIS geometry type with SRID 4326
+  properties Json?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@unique([siteId, year])
   @@index([siteId, year])
-  @@schema("spatial")
   @@map("site_boundaries")
+  @@schema("spatial")
 }
 
 model Raster {
-  id                Int       @id @default(autoincrement())
-  siteId            Int?
-  site              Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  id     Int   @id @default(autoincrement())
+  siteId Int?
+  site   Site? @relation(fields: [siteId], references: [id], onDelete: SetNull)
 
   // File metadata
-  fileName          String
-  originalFileName  String?
-  fileSize          BigInt
-  mimeType          String?
-  minioUrl          String    @unique
-  minioKey          String
+  fileName         String
+  originalFileName String?
+  fileSize         BigInt
+  mimeType         String?
+  minioUrl         String  @unique
+  minioKey         String
 
   // Geospatial metadata
-  bbox              Json?
-  crs               String?
-  width             Int?
-  height            Int?
-  bandCount         Int?
+  bbox      Json?
+  center    Json? // {lon, lat, zoom} from TiTiler
+  crs       String?
+  width     Int?
+  height    Int?
+  bandCount Int?
 
   // Classification
-  isClassified      Boolean   @default(false)
-  classifications   Json?
+  isClassified    Boolean @default(false)
+  classifications Json?
 
   // Temporal
-  year              Int
-  acquisitionDate   DateTime?
+  year            Int
+  acquisitionDate DateTime?
 
   // Audit
-  uploadedById      Int?
-  uploadedBy        User?     @relation("uploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
-  isActive          Boolean   @default(true)
+  uploadedById Int?
+  uploadedBy   User?   @relation("uploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  isActive     Boolean @default(true)
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  baseRasterMetrics        YearlyMetrics[] @relation("baseRasterMetrics")
-  classifiedRasterMetrics  YearlyMetrics[] @relation("classifiedRasterMetrics")
-  
+  baseRasterMetrics       YearlyMetrics[] @relation("baseRasterMetrics")
+  classifiedRasterMetrics YearlyMetrics[] @relation("classifiedRasterMetrics")
+
   @@index([siteId, year, isClassified])
   @@index([uploadedById])
-  @@schema("spatial")
   @@map("rasters")
+  @@schema("spatial")
 }
 
 // Photo model for event photos, site photos, and species reference images
 model Photo {
-  id               Int           @id @default(autoincrement())
-  
+  id Int @id @default(autoincrement())
+
   // File metadata
   fileName         String
   originalFileName String
   fileSize         BigInt
   mimeType         String
-  minioUrl         String        @unique
+  minioUrl         String @unique
   minioKey         String
-  
+
   // Categorization
-  category         PhotoCategory @default(EVENT)
-  
+  category PhotoCategory @default(EVENT)
+
   // Relations
-  siteId           Int?
-  site             Site?         @relation(fields: [siteId], references: [id], onDelete: SetNull)
-  speciesId        Int?
-  species          Species?      @relation(fields: [speciesId], references: [id], onDelete: SetNull)
-  
+  siteId    Int?
+  site      Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  speciesId Int?
+  species   Species? @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+
   // Temporal
-  year             Int?
-  captureDate      DateTime?
-  
+  year        Int?
+  captureDate DateTime?
+
   // Geospatial
-  latitude         Float?
-  longitude        Float?
-  
+  latitude  Float?
+  longitude Float?
+
   // Descriptive
-  caption          String?
-  description      String?       @db.Text
-  tags             String[]      @default([])
-  
+  caption     String?
+  description String?  @db.Text
+  tags        String[] @default([])
+
   // Audit
-  uploadedById     Int?
-  uploadedBy       User?         @relation("uploadedPhotos", fields: [uploadedById], references: [id], onDelete: SetNull)
-  isActive         Boolean       @default(true)
-  
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  
+  uploadedById Int?
+  uploadedBy   User?   @relation("uploadedPhotos", fields: [uploadedById], references: [id], onDelete: SetNull)
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([siteId, year, category])
   @@index([speciesId])
   @@index([uploadedById])
-  @@schema("spatial")
   @@map("photos")
+  @@schema("spatial")
 }
 
 enum PhotoCategory {
-  EVENT          // Tree planting, training, community events
-  SITE           // Site overview, infrastructure photos
-  SPECIES        // Reference images for tree species
-  
+  EVENT // Tree planting, training, community events
+  SITE // Site overview, infrastructure photos
+  SPECIES // Reference images for tree species
+
   @@schema("spatial")
 }
 
 // Species catalog for trees and plants
 model Species {
-  id              Int            @id @default(autoincrement())
-  
+  id Int @id @default(autoincrement())
+
   // Legacy field for backward compatibility
-  code            String?        @unique
-  
+  code String? @unique
+
   // Scientific naming
-  scientificName  String         @unique
-  botanicalName   String?        // Alias for scientificName (legacy)
-  localName       String
-  englishName     String
-  
+  scientificName String  @unique
+  botanicalName  String? // Alias for scientificName (legacy)
+  localName      String
+  englishName    String
+
   // Educational content
-  description     String         @db.Text
-  uses            String         @db.Text
-  
+  description String @db.Text
+  uses        String @db.Text
+
   // Reference images (4 standard views)
-  image1Url       String?        // Habitat view
-  image2Url       String?        // Leaf close-up
-  image3Url       String?        // Bark texture
-  image4Url       String?        // Seed/flower
-  imagePath       String?        // Legacy single image path
-  
+  image1Url String? // Habitat view
+  image2Url String? // Leaf close-up
+  image3Url String? // Bark texture
+  image4Url String? // Seed/flower
+  imagePath String? // Legacy single image path
+
   // Relations
-  sites           SitesSpecies[]
-  photos          Photo[]
-  
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  
-  @@schema("core")
+  sites  SitesSpecies[]
+  photos Photo[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("species")
+  @@schema("core")
 }
 
 // Many-to-many join table for Sites and Species
 model SitesSpecies {
-  siteId       Int
-  site         Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  speciesId    Int
-  species      Species  @relation(fields: [speciesId], references: [id], onDelete: Cascade)
-  
-  plantedCount Int?     // Number of this species planted at site
-  plantedYear  Int?     // Year planted
-  
+  siteId    Int
+  site      Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  speciesId Int
+  species   Species @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+
+  plantedCount Int? // Number of this species planted at site
+  plantedYear  Int? // Year planted
+
   @@id([siteId, speciesId])
-  @@schema("core")
   @@map("sites_species")
+  @@schema("core")
 }
