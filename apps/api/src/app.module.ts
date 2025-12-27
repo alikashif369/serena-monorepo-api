@@ -18,6 +18,11 @@ import { SpeciesModule } from './modules/species/species.module';
 import { PhotosModule } from './modules/photos/photos.module';
 import { AggregateMetricsModule } from './modules/aggregate-metrics/aggregate-metrics.module';
 import { CategorySummariesModule } from './modules/category-summaries/category-summaries.module';
+import { PlantationDataModule } from './modules/plantation-data/plantation-data.module';
+import { SolarDataModule } from './modules/solar-data/solar-data.module';
+import { WasteDataModule } from './modules/waste-data/waste-data.module';
+import { SewageDataModule } from './modules/sewage-data/sewage-data.module';
+import { SiteSpeciesModule } from './modules/site-species/site-species.module';
 
 @Module({
   imports: [
@@ -41,6 +46,11 @@ import { CategorySummariesModule } from './modules/category-summaries/category-s
     PhotosModule,
     AggregateMetricsModule,
     CategorySummariesModule,
+    PlantationDataModule,
+    SolarDataModule,
+    WasteDataModule,
+    SewageDataModule,
+    SiteSpeciesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
