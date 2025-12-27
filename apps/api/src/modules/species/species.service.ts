@@ -91,4 +91,18 @@ export class SpeciesService {
       },
     });
   }
+
+  async delete(id: number) {
+    const species = await this.prisma.species.findUnique({
+      where: { id },
+    });
+
+    if (!species) {
+      throw new NotFoundException(`Species with ID ${id} not found`);
+    }
+
+    return this.prisma.species.delete({
+      where: { id },
+    });
+  }
 }

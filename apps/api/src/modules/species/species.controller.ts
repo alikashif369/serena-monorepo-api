@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { SpeciesService } from './species.service';
 import { CreateSpeciesDto, UpdateSpeciesDto } from './dto/create-species.dto';
@@ -35,5 +35,12 @@ export class SpeciesController {
   @ApiBody({ type: UpdateSpeciesDto })
   async update(@Param('id') id: string, @Body() body: UpdateSpeciesDto) {
     return this.speciesService.update(parseInt(id), body);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete species' })
+  @ApiParam({ name: 'id', description: 'Species ID' })
+  async delete(@Param('id') id: string) {
+    return this.speciesService.delete(parseInt(id));
   }
 }
