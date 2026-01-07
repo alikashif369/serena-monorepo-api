@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -9,6 +9,30 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
+
+  /**
+   * Get user profile by ID
+   */
+  async getProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
@@ -76,7 +100,7 @@ export class AuthService {
         email,
         password: hashedPassword,
         name,
-        role: 'VIEWER', // Default role
+        role: 'ADMIN', // Default role for invited admins
         status: 'ACTIVE',
       },
       select: {
@@ -91,5 +115,84 @@ export class AuthService {
 
     // Generate JWT token
     return this.login(user);
+  }
+
+  /**
+   * List all admin users (SUPER_ADMIN only)
+   */
+  async listUsers(page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where: {
+          role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.user.count({
+        where: {
+          role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+        },
+      }),
+    ]);
+
+    return {
+      data: users,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Delete a user (SUPER_ADMIN only)
+   * Cannot delete yourself or other SUPER_ADMINs
+   */
+  async deleteUser(userId: number, requesterId: number) {
+    // Prevent self-deletion
+    if (userId === requesterId) {
+      throw new ConflictException('You cannot delete your own account');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Prevent deleting other SUPER_ADMINs
+    if (user.role === 'SUPER_ADMIN') {
+      throw new ConflictException('Cannot delete a SUPER_ADMIN user');
+    }
+
+    // Delete related invitations first (where this user was the inviter)
+    await this.prisma.adminInvitation.deleteMany({
+      where: { invitedBy: userId },
+    });
+
+    // Delete the user
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return { message: `User ${user.email} has been deleted successfully` };
   }
 }

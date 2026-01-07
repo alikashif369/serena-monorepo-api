@@ -21,7 +21,7 @@ model User {
   email                 String     @unique
   password              String
   name                  String
-  role                  UserRole   @default(VIEWER)
+  role                  UserRole   @default(ADMIN)
   status                UserStatus @default(ACTIVE)
   phone                 String?
   emailVerificationCode String?
@@ -39,6 +39,7 @@ model User {
   uploadedPhotos           Photo[]            @relation("uploadedPhotos")
   updatedAggregateMetrics  AggregateMetrics[]
   updatedCategorySummaries CategorySummary[]
+  invitationsSent          AdminInvitation[]  @relation("InvitedBy")
 
   @@map("users")
   @@schema("auth")
@@ -75,13 +76,25 @@ model DeviceInfo {
   @@schema("auth")
 }
 
+model AdminInvitation {
+  id         Int       @id @default(autoincrement())
+  email      String    @unique
+  token      String    @unique
+  role       UserRole  @default(ADMIN)
+  invitedBy  Int
+  inviter    User      @relation("InvitedBy", fields: [invitedBy], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("admin_invitations")
+  @@schema("auth")
+}
+
 enum UserRole {
-  VIEWER
-  SITE_MANAGER
-  GIS_ANALYST
-  DATA_ADMIN
-  SYSTEM_ADMIN
-  SUPER_ADMIN
+  SUPER_ADMIN // Full admin access, can invite other admins
+  ADMIN       // Admin panel access, cannot invite others
 
   @@schema("auth")
 }

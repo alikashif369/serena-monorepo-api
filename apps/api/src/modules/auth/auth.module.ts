@@ -6,12 +6,15 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from '@shared-config/authentication/strategy/jwt.strategy';
 import { LocalStrategy } from '@shared-config/authentication/strategy/local.strategy';
+import { RolesGuard } from '@shared-config/authentication';
 import { PrismaModule } from '../prisma/prisma.module';
+import { InvitationModule } from '../invitation/invitation.module';
 
 @Module({
   imports: [
     PrismaModule,
     PassportModule,
+    InvitationModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -23,7 +26,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, LocalStrategy, RolesGuard],
+  exports: [AuthService, RolesGuard],
 })
 export class AuthModule {}

@@ -108,7 +108,8 @@ export class PlantationDataService {
       throw new ConflictException(`PlantationData already exists for site ${dto.siteId}`);
     }
 
-    return this.prisma.plantationData.create({
+    // Create plantation data
+    const plantationData = await this.prisma.plantationData.create({
       data: dto,
       include: {
         site: {
@@ -120,6 +121,11 @@ export class PlantationDataService {
         },
       },
     });
+
+    // Sync species to SitesSpecies table
+    await this.syncSpeciesToSite(dto.siteId, dto.species, dto.plants);
+
+    return plantationData;
   }
 
   async update(id: number, dto: UpdatePlantationDataDto) {
@@ -131,7 +137,8 @@ export class PlantationDataService {
       throw new NotFoundException(`PlantationData with ID ${id} not found`);
     }
 
-    return this.prisma.plantationData.update({
+    // Update plantation data
+    const updated = await this.prisma.plantationData.update({
       where: { id },
       data: dto,
       include: {
@@ -144,6 +151,52 @@ export class PlantationDataService {
         },
       },
     });
+
+    // Sync species to SitesSpecies table if species were updated
+    if (dto.species) {
+      await this.syncSpeciesToSite(existing.siteId, dto.species, dto.plants || existing.plants);
+    }
+
+    return updated;
+  }
+
+  // Helper method to sync species array to SitesSpecies table
+  private async syncSpeciesToSite(siteId: number, speciesCodes: string[], totalPlants: number) {
+    if (!speciesCodes || speciesCodes.length === 0) return;
+
+    // Find species by codes
+    const speciesList = await this.prisma.species.findMany({
+      where: {
+        OR: [
+          { code: { in: speciesCodes } },
+          { scientificName: { in: speciesCodes } },
+        ],
+      },
+    });
+
+    // Calculate plants per species (distribute evenly if multiple species)
+    const plantsPerSpecies = Math.floor(totalPlants / speciesCodes.length);
+
+    // Create/update SitesSpecies records
+    for (const species of speciesList) {
+      await this.prisma.sitesSpecies.upsert({
+        where: {
+          siteId_speciesId: {
+            siteId,
+            speciesId: species.id,
+          },
+        },
+        create: {
+          siteId,
+          speciesId: species.id,
+          plantedCount: plantsPerSpecies,
+          plantedYear: new Date().getFullYear(),
+        },
+        update: {
+          plantedCount: plantsPerSpecies,
+        },
+      });
+    }
   }
 
   async delete(id: number) {

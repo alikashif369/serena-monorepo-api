@@ -37,27 +37,34 @@ export class SpeciesService {
 
   async create(dto: any) {
     try {
+      // Handle both scientificName and botanicalName (legacy)
+      const scientificName = dto.scientificName || dto.botanicalName;
+      const botanicalName = dto.botanicalName || dto.scientificName;
+
+      if (!scientificName) {
+        throw new Error('Scientific name is required');
+      }
+
       return await this.prisma.species.create({
         data: {
-          scientificName: dto.scientificName,
+          scientificName,
+          botanicalName,
           localName: dto.localName,
           englishName: dto.englishName,
           description: dto.description,
           uses: dto.uses,
-          // Legacy fields (optional, for backward compatibility)
-          code: dto.code,
-          botanicalName: dto.botanicalName || dto.scientificName,
-          imagePath: dto.imagePath,
-          // New image URLs
-          image1Url: dto.image1Url,
-          image2Url: dto.image2Url,
-          image3Url: dto.image3Url,
-          image4Url: dto.image4Url,
+          // Optional fields
+          code: dto.code || undefined,
+          imagePath: dto.imagePath || undefined,
+          image1Url: dto.image1Url || undefined,
+          image2Url: dto.image2Url || undefined,
+          image3Url: dto.image3Url || undefined,
+          image4Url: dto.image4Url || undefined,
         },
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(`Species with scientific name ${dto.scientificName} already exists`);
+        throw new ConflictException(`Species with scientific name already exists`);
       }
       throw error;
     }
@@ -72,23 +79,36 @@ export class SpeciesService {
       throw new NotFoundException(`Species with ID ${id} not found`);
     }
 
+    // Prepare update data
+    const updateData: any = {};
+
+    // Handle scientificName and botanicalName
+    if (dto.scientificName !== undefined) {
+      updateData.scientificName = dto.scientificName;
+      // Also update botanicalName to keep them in sync
+      if (!dto.botanicalName) {
+        updateData.botanicalName = dto.scientificName;
+      }
+    }
+    if (dto.botanicalName !== undefined) {
+      updateData.botanicalName = dto.botanicalName;
+    }
+
+    // Other fields
+    if (dto.code !== undefined) updateData.code = dto.code;
+    if (dto.localName !== undefined) updateData.localName = dto.localName;
+    if (dto.englishName !== undefined) updateData.englishName = dto.englishName;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.uses !== undefined) updateData.uses = dto.uses;
+    if (dto.imagePath !== undefined) updateData.imagePath = dto.imagePath;
+    if (dto.image1Url !== undefined) updateData.image1Url = dto.image1Url;
+    if (dto.image2Url !== undefined) updateData.image2Url = dto.image2Url;
+    if (dto.image3Url !== undefined) updateData.image3Url = dto.image3Url;
+    if (dto.image4Url !== undefined) updateData.image4Url = dto.image4Url;
+
     return this.prisma.species.update({
       where: { id },
-      data: {
-        ...(dto.scientificName !== undefined && { scientificName: dto.scientificName }),
-        ...(dto.localName !== undefined && { localName: dto.localName }),
-        ...(dto.englishName !== undefined && { englishName: dto.englishName }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.uses !== undefined && { uses: dto.uses }),
-        // Legacy fields
-        ...(dto.botanicalName !== undefined && { botanicalName: dto.botanicalName }),
-        ...(dto.imagePath !== undefined && { imagePath: dto.imagePath }),
-        // New image URLs
-        ...(dto.image1Url !== undefined && { image1Url: dto.image1Url }),
-        ...(dto.image2Url !== undefined && { image2Url: dto.image2Url }),
-        ...(dto.image3Url !== undefined && { image3Url: dto.image3Url }),
-        ...(dto.image4Url !== undefined && { image4Url: dto.image4Url }),
-      },
+      data: updateData,
     });
   }
 

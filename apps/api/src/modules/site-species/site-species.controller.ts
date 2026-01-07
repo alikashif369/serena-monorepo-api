@@ -7,10 +7,27 @@ import {
   Param,
   Body,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { SiteSpeciesService } from './site-species.service';
 import { AddSpeciesToSiteDto, UpdateSiteSpeciesDto } from './dto/site-species.dto';
+
+// Dashboard-friendly controller for querying site-species by query params
+@ApiTags('Site Species')
+@Controller('site-species')
+export class SiteSpeciesDashboardController {
+  constructor(private siteSpeciesService: SiteSpeciesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Get species for a site (query param)' })
+  @ApiQuery({ name: 'siteId', description: 'Site ID', type: Number, required: true })
+  @ApiResponse({ status: 200, description: 'List of species at the site' })
+  @ApiResponse({ status: 404, description: 'Site not found' })
+  async findBySiteQuery(@Query('siteId', ParseIntPipe) siteId: number) {
+    return this.siteSpeciesService.findBySite(siteId);
+  }
+}
 
 @ApiTags('Site Species')
 @Controller('sites/:siteId/species')

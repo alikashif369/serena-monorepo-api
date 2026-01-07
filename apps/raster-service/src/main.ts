@@ -5,7 +5,9 @@ import { RasterServiceModule } from './raster-service.module';
 import { rasterServicePort, corsOrigin } from '@shared-config/env';
 
 async function bootstrap() {
-  const app = await NestFactory.create(RasterServiceModule);
+  const app = await NestFactory.create(RasterServiceModule, {
+    bodyParser: true,
+  });
 
   // Global prefix
   app.setGlobalPrefix('api');

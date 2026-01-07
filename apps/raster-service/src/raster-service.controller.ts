@@ -84,7 +84,7 @@ export class RasterServiceController {
   }
 
   @Get(':id/tiles/:z/:x/:y.png')
-  @ApiOperation({ summary: 'Proxy tile request to TiTiler' })
+  @ApiOperation({ summary: 'Proxy tile request to TiTiler (No rate limit for fast tile serving)' })
   async getTile(
     @Param('id') id: string,
     @Param('z') z: string,
@@ -93,23 +93,30 @@ export class RasterServiceController {
     @Res() res: Response,
   ) {
     const tileUrl = await this.rasterService.getTile(Number(id), Number(z), Number(x), Number(y));
-    console.log('[Tiles] Proxying request to TiTiler', tileUrl);
+    
     try {
       const response = await fetch(tileUrl);
-      console.log('[Tiles] TiTiler response', { status: response.status, ok: response.ok });
+      
       if (!response.ok) {
+        // Return empty tile for 404s (normal for missing tiles)
+        if (response.status === 404) {
+          res.status(404).end();
+          return;
+        }
         const text = await response.text();
-        console.error('[Tiles] TiTiler error body', text);
+        console.error('[Tiles] TiTiler error', { status: response.status, body: text });
         res.status(response.status).send(text);
         return;
       }
+      
       const buffer = await response.arrayBuffer();
       res.set('Content-Type', 'image/png');
-      res.set('Cache-Control', 'public, max-age=3600');
+      res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      res.set('Access-Control-Allow-Origin', '*'); // Allow CORS for tiles
       res.send(Buffer.from(buffer));
     } catch (err: any) {
       console.error('[Tiles] Proxy error', err?.message || err);
-      res.status(500).send('Tile proxy failed');
+      res.status(500).end();
     }
   }
 
