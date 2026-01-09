@@ -25,6 +25,7 @@ import { SolarDataModule } from './modules/solar-data/solar-data.module';
 import { WasteDataModule } from './modules/waste-data/waste-data.module';
 import { SewageDataModule } from './modules/sewage-data/sewage-data.module';
 import { SiteSpeciesModule } from './modules/site-species/site-species.module';
+import { TileCacheModule } from './modules/tile-cache/tile-cache.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { SiteSpeciesModule } from './modules/site-species/site-species.module';
     WasteDataModule,
     SewageDataModule,
     SiteSpeciesModule,
+    TileCacheModule,
   ],
   controllers: [AppController],
   providers: [

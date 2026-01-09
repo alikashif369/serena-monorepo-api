@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinioService } from '../../common/services/minio.service';
+import { DiskTileCacheService } from '../tile-cache/disk-tile-cache.service';
 import { Prisma } from '@prisma/client';
 import * as path from 'path';
 import { fromArrayBuffer } from 'geotiff';
@@ -11,6 +12,7 @@ export class RastersService {
   constructor(
     private prisma: PrismaService,
     private minio: MinioService,
+    private tileCacheService: DiskTileCacheService,
   ) {}
 
   async upload(
@@ -297,10 +299,20 @@ export class RastersService {
       console.log(`📥 TiTiler response: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
-        // If TiTiler couldn't fetch the file directly from MinIO, try with a presigned URL
         const errorText = await response.text();
+
+        // Check if tile is outside raster bounds - return transparent PNG instead of error
+        if (errorText.includes('outside bounds') || errorText.includes('outside image bounds')) {
+          console.log(`📭 Tile outside bounds: z=${z} x=${x} y=${y} - returning transparent tile`);
+          return {
+            buffer: this.getTransparentPng(),
+            contentType: 'image/png',
+          };
+        }
+
         console.warn('❌ TiTiler initial error response:', response.status, errorText);
 
+        // Only retry with presigned URL for access/auth errors (not bounds errors)
         try {
           // Extract bucket and key from either full URL or relative path
           let pathParts: string[];
@@ -320,11 +332,19 @@ export class RastersService {
           // Generate presigned URL valid for 1 hour
           const presigned = await this.minio.getPresignedUrl(bucket, key, 3600);
           const tileUrl2 = `${titilerUrl}/cog/tiles/WebMercatorQuad/${z}/${x}/${y}.png?url=${encodeURIComponent(presigned)}&bidx=1&bidx=2&bidx=3&rescale=0,255&minzoom=0&maxzoom=24&resampling_method=bilinear&return_mask=true`;
-          console.log('🔁 Retrying TiTiler with presigned URL', tileUrl2);
+          console.log('🔁 Retrying TiTiler with presigned URL');
 
           const resp2 = await fetch(tileUrl2);
           if (!resp2.ok) {
             const err2 = await resp2.text();
+            // Check for bounds error on retry too
+            if (err2.includes('outside bounds') || err2.includes('outside image bounds')) {
+              console.log(`📭 Tile outside bounds (retry): z=${z} x=${x} y=${y}`);
+              return {
+                buffer: this.getTransparentPng(),
+                contentType: 'image/png',
+              };
+            }
             console.error('❌ TiTiler error response (presigned):', err2);
             throw new Error(`TiTiler returned ${resp2.status}: ${resp2.statusText}`);
           }
@@ -443,6 +463,26 @@ export class RastersService {
     }
   }
 
+  /**
+   * Generate a minimal 1x1 transparent PNG
+   * Used for tiles that are outside the raster bounds
+   */
+  private getTransparentPng(): Buffer {
+    // Minimal valid 1x1 transparent PNG (67 bytes)
+    // This is a pre-computed PNG that renders as a transparent pixel
+    return Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
+      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 dimensions
+      0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+      0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, // IDAT chunk
+      0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+      0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, // compressed data
+      0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, // IEND chunk
+      0x42, 0x60, 0x82,
+    ]);
+  }
+
   async delete(id: number) {
     const raster = await this.prisma.raster.findUnique({
       where: { id },
@@ -451,6 +491,10 @@ export class RastersService {
     if (!raster) {
       throw new NotFoundException(`Raster with ID ${id} not found`);
     }
+
+    // Invalidate tile cache for this raster
+    await this.tileCacheService.invalidateRaster(id);
+    console.log(`[RastersService] Invalidated tile cache for raster ${id}`);
 
     // TODO: Delete from MinIO
     // const minioClient = new MinioClient(...);

@@ -50,3 +50,8 @@ export const rasterTileRateLimitPerMinute = Number(process.env.RASTER_TILE_RATE_
 export const nodeEnv = process.env.NODE_ENV || 'development';
 export const isProduction = nodeEnv === 'production';
 export const isDevelopment = nodeEnv === 'development';
+
+// Tile Cache Configuration
+export const tileCacheEnabled = process.env.TILE_CACHE_ENABLED !== 'false';
+export const tileCachePath = process.env.TILE_CACHE_PATH || 'C:\\serena-tile-cache';
+export const tileCacheMaxSizeGB = Number(process.env.TILE_CACHE_MAX_SIZE_GB || '10');
