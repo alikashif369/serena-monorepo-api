@@ -122,6 +122,27 @@ export class SitesController {
     return this.sitesService.remove(parseInt(id));
   }
 
+  @Post('cleanup/orphaned-boundaries')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Clean up orphaned boundaries for deleted sites' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cleanup completed',
+    schema: {
+      type: 'object',
+      properties: {
+        count: { type: 'number', description: 'Number of orphaned boundaries deleted' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  async cleanupOrphanedBoundaries() {
+    return this.sitesService.cleanupOrphanedBoundaries();
+  }
+
   @Get(':id/metrics')
   @ApiOperation({ summary: 'Get yearly metrics for site' })
   @ApiParam({ name: 'id', description: 'Site ID', type: Number })

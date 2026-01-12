@@ -32,12 +32,12 @@ export class RastersService {
       throw new BadRequestException('Only GeoTIFF files are allowed');
     }
 
-    // Verify site exists
+    // Verify site exists and is not soft-deleted
     const site = await this.prisma.site.findUnique({
       where: { id: siteId },
     });
 
-    if (!site) {
+    if (!site || site.deletedAt !== null) {
       throw new NotFoundException(`Site with ID ${siteId} not found`);
     }
 
@@ -169,7 +169,12 @@ export class RastersService {
   }
 
   async findAll(query?: any) {
-    const where: any = {};
+    const where: any = {
+      // Only include rasters for sites that are not soft-deleted
+      site: {
+        deletedAt: null,
+      },
+    };
 
     if (query?.siteId) where.siteId = parseInt(query.siteId);
     if (query?.year) where.year = parseInt(query.year);
@@ -214,6 +219,7 @@ export class RastersService {
             id: true,
             name: true,
             slug: true,
+            deletedAt: true,
             category: {
               select: {
                 id: true,
@@ -233,7 +239,8 @@ export class RastersService {
       },
     });
 
-    if (!raster) {
+    // Check if raster exists and site is not soft-deleted
+    if (!raster || raster.site?.deletedAt !== null) {
       throw new NotFoundException(`Raster with ID ${id} not found`);
     }
 
@@ -507,25 +514,25 @@ export class RastersService {
 
     // Clean up orphaned YearlyMetrics records
     // Find all YearlyMetrics for this site and year that now have both rasters as null
-    const orphanedMetrics = await this.prisma.yearlyMetrics.findMany({
-      where: {
-        siteId: raster.siteId,
-        year: raster.year,
-        baseRasterId: null,
-        classifiedRasterId: null,
-      },
-    });
-
-    // Delete orphaned YearlyMetrics to prevent empty years in the timeline
-    if (orphanedMetrics.length > 0) {
-      await this.prisma.yearlyMetrics.deleteMany({
+    // Only if raster has a siteId (not null)
+    if (raster.siteId) {
+      const orphanedMetrics = await this.prisma.yearlyMetrics.findMany({
         where: {
-          id: {
-            in: orphanedMetrics.map(m => m.id),
-          },
+          siteId: raster.siteId,
+          year: raster.year,
+          baseRasterId: null,
+          classifiedRasterId: null,
         },
       });
-      console.log(`[RastersService] Deleted ${orphanedMetrics.length} orphaned YearlyMetrics record(s) for site ${raster.siteId}, year ${raster.year}`);
+
+      if (orphanedMetrics.length > 0) {
+        await this.prisma.yearlyMetrics.deleteMany({
+          where: {
+            id: { in: orphanedMetrics.map(m => m.id) },
+          },
+        });
+        console.log(`[RastersService] Deleted ${orphanedMetrics.length} orphaned YearlyMetrics record(s) for site ${raster.siteId}, year ${raster.year}`);
+      }
     }
 
     return { message: `Raster ${id} deleted successfully` };

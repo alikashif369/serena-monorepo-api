@@ -6,12 +6,12 @@ export class VectorsService {
   constructor(private prisma: PrismaService) {}
 
   async create(siteId: number, year: number, geometry: any, properties?: any) {
-    // Verify site exists
+    // Verify site exists and is not soft-deleted
     const site = await this.prisma.site.findUnique({
       where: { id: siteId },
     });
 
-    if (!site) {
+    if (!site || site.deletedAt !== null) {
       throw new NotFoundException(`Site with ID ${siteId} not found`);
     }
 
@@ -50,7 +50,12 @@ export class VectorsService {
   }
 
   async findAll(query?: any) {
-    const where: any = {};
+    const where: any = {
+      // Only include boundaries for sites that are not soft-deleted
+      site: {
+        deletedAt: null,
+      },
+    };
 
     if (query?.siteId) where.siteId = parseInt(query.siteId);
     if (query?.year) where.year = parseInt(query.year);
@@ -65,6 +70,7 @@ export class VectorsService {
             id: true,
             name: true,
             slug: true,
+            deletedAt: true, // Include deletedAt so frontend can double-check
             category: {
               select: {
                 id: true,
@@ -88,6 +94,7 @@ export class VectorsService {
             id: true,
             name: true,
             slug: true,
+            deletedAt: true,
             category: {
               select: {
                 id: true,
@@ -107,7 +114,8 @@ export class VectorsService {
       },
     });
 
-    if (!boundary) {
+    // Check if boundary exists and site is not soft-deleted
+    if (!boundary || boundary.site?.deletedAt !== null) {
       throw new NotFoundException(`Boundary with ID ${id} not found`);
     }
 
@@ -117,9 +125,15 @@ export class VectorsService {
   async update(id: string, geometry?: any, properties?: any) {
     const boundary = await this.prisma.siteBoundary.findUnique({
       where: { id },
+      include: {
+        site: {
+          select: { deletedAt: true },
+        },
+      },
     });
 
-    if (!boundary) {
+    // Check if boundary exists and site is not soft-deleted
+    if (!boundary || boundary.site?.deletedAt !== null) {
       throw new NotFoundException(`Boundary with ID ${id} not found`);
     }
 
@@ -151,9 +165,15 @@ export class VectorsService {
   async delete(id: string) {
     const boundary = await this.prisma.siteBoundary.findUnique({
       where: { id },
+      include: {
+        site: {
+          select: { deletedAt: true },
+        },
+      },
     });
 
-    if (!boundary) {
+    // Check if boundary exists and site is not soft-deleted
+    if (!boundary || boundary.site?.deletedAt !== null) {
       throw new NotFoundException(`Boundary with ID ${id} not found`);
     }
 
@@ -167,7 +187,12 @@ export class VectorsService {
   async searchWithin(_geometry: any, siteIds?: number[]) {
     // This would use PostGIS ST_Within or ST_Intersects function
     // For now, return filtered boundaries
-    const where: any = {};
+    const where: any = {
+      // Only include boundaries for sites that are not soft-deleted
+      site: {
+        deletedAt: null,
+      },
+    };
 
     if (siteIds && siteIds.length > 0) {
       where.siteId = { in: siteIds };
@@ -175,7 +200,7 @@ export class VectorsService {
 
     // TODO: Implement actual spatial query using Prisma raw SQL with PostGIS
     // Example: SELECT * FROM spatial.site_boundaries WHERE ST_Within(geometry, ST_GeomFromGeoJSON($1))
-    
+
     return this.prisma.siteBoundary.findMany({
       where,
       include: {

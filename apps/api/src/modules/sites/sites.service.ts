@@ -253,16 +253,120 @@ export class SitesService {
       throw new NotFoundException(`Site with ID ${id} not found`);
     }
 
-    // Soft delete
-    return await this.prisma.site.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-      include: {
-        category: {
-          select: { id: true, name: true, slug: true },
+    console.log(`[SITE_DELETE] Starting deletion process for site ${id} (${site.name})`);
+
+    // Use a transaction to ensure all deletions happen atomically
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Delete associated data first (cascade delete)
+      // Order matters due to foreign key constraints
+
+      // 1. Delete yearly metrics (has FK to rasters)
+      const deletedMetrics = await tx.yearlyMetrics.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedMetrics.count} yearly metrics for site ${id}`);
+
+      // 2. Delete rasters
+      const deletedRasters = await tx.raster.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedRasters.count} rasters for site ${id}`);
+
+      // 3. Delete site boundaries (HARD DELETE)
+      const deletedBoundaries = await tx.siteBoundary.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedBoundaries.count} boundaries for site ${id}`);
+
+      // 4. Delete photos (set siteId to null instead of deleting)
+      const updatedPhotos = await tx.photo.updateMany({
+        where: { siteId: id },
+        data: { siteId: null },
+      });
+      console.log(`[SITE_DELETE] Unlinked ${updatedPhotos.count} photos from site ${id}`);
+
+      // 5. Delete site species relationships
+      const deletedSiteSpecies = await tx.sitesSpecies.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedSiteSpecies.count} site-species relationships for site ${id}`);
+
+      // 6. Delete plantation data
+      const deletedPlantation = await tx.plantationData.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedPlantation.count} plantation records for site ${id}`);
+
+      // 7. Delete solar data
+      const deletedSolar = await tx.solarData.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedSolar.count} solar records for site ${id}`);
+
+      // 8. Delete waste data
+      const deletedWaste = await tx.wasteData.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedWaste.count} waste records for site ${id}`);
+
+      // 9. Delete sewage data
+      const deletedSewage = await tx.sewageData.deleteMany({
+        where: { siteId: id },
+      });
+      console.log(`[SITE_DELETE] Deleted ${deletedSewage.count} sewage records for site ${id}`);
+
+      // 10. Soft delete the site
+      const deletedSite = await tx.site.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+        include: {
+          category: {
+            select: { id: true, name: true, slug: true },
+          },
+        },
+      });
+
+      console.log(`[SITE_DELETE] Successfully soft-deleted site ${id}`);
+      return deletedSite;
+    });
+
+    return result;
+  }
+
+  /**
+   * Clean up orphaned boundaries for soft-deleted sites
+   * This is a maintenance method to clean up data inconsistencies
+   */
+  async cleanupOrphanedBoundaries(): Promise<{ count: number }> {
+    console.log('[CLEANUP] Starting cleanup of orphaned site boundaries...');
+    
+    // Find all boundaries where the site is soft-deleted
+    const orphanedBoundaries = await this.prisma.siteBoundary.findMany({
+      where: {
+        site: {
+          deletedAt: { not: null },
+        },
+      },
+      select: { id: true, siteId: true },
+    });
+
+    console.log(`[CLEANUP] Found ${orphanedBoundaries.length} orphaned boundaries`);
+
+    if (orphanedBoundaries.length === 0) {
+      return { count: 0 };
+    }
+
+    // Delete them
+    const deleted = await this.prisma.siteBoundary.deleteMany({
+      where: {
+        id: {
+          in: orphanedBoundaries.map(b => b.id),
         },
       },
     });
+
+    console.log(`[CLEANUP] Deleted ${deleted.count} orphaned boundaries`);
+    return { count: deleted.count };
   }
 
   async getYearlyMetrics(siteId: number, years?: number[]) {
