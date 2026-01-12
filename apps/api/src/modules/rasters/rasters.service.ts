@@ -500,9 +500,33 @@ export class RastersService {
     // const minioClient = new MinioClient(...);
     // await minioClient.removeObject(bucket, raster.minioKey);
 
+    // Delete the raster (this will set the foreign key to NULL in YearlyMetrics due to onDelete: SetNull)
     await this.prisma.raster.delete({
       where: { id },
     });
+
+    // Clean up orphaned YearlyMetrics records
+    // Find all YearlyMetrics for this site and year that now have both rasters as null
+    const orphanedMetrics = await this.prisma.yearlyMetrics.findMany({
+      where: {
+        siteId: raster.siteId,
+        year: raster.year,
+        baseRasterId: null,
+        classifiedRasterId: null,
+      },
+    });
+
+    // Delete orphaned YearlyMetrics to prevent empty years in the timeline
+    if (orphanedMetrics.length > 0) {
+      await this.prisma.yearlyMetrics.deleteMany({
+        where: {
+          id: {
+            in: orphanedMetrics.map(m => m.id),
+          },
+        },
+      });
+      console.log(`[RastersService] Deleted ${orphanedMetrics.length} orphaned YearlyMetrics record(s) for site ${raster.siteId}, year ${raster.year}`);
+    }
 
     return { message: `Raster ${id} deleted successfully` };
   }
