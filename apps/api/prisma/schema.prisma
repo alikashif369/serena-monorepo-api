@@ -37,7 +37,7 @@ model User {
   deviceInfo               DeviceInfo[]
   uploadedRasters          Raster[]           @relation("uploadedBy")
   uploadedPhotos           Photo[]            @relation("uploadedPhotos")
-  updatedAggregateMetrics  AggregateMetrics[]
+  // updatedAggregateMetrics  AggregateMetrics[]
   updatedCategorySummaries CategorySummary[]
   invitationsSent          AdminInvitation[]  @relation("InvitedBy")
 
@@ -118,6 +118,7 @@ enum EntityType {
   @@schema("core")
 }
 
+/*
 enum MetricType {
   // Plantation
   PLANTATION_TARGET
@@ -146,6 +147,7 @@ enum MetricType {
 
   @@schema("core")
 }
+*/
 
 model Organization {
   id          Int       @id @default(autoincrement())
@@ -157,7 +159,7 @@ model Organization {
   deletedAt   DateTime?
 
   regions           Region[]
-  aggregateMetrics  AggregateMetrics[]
+  // aggregateMetrics  AggregateMetrics[]
   categorySummaries CategorySummary[]
 
   @@map("organizations")
@@ -175,7 +177,7 @@ model Region {
   deletedAt      DateTime?
 
   categories        Category[]
-  aggregateMetrics  AggregateMetrics[]
+  // aggregateMetrics  AggregateMetrics[]
   categorySummaries CategorySummary[]
 
   @@unique([organizationId, slug])
@@ -196,7 +198,7 @@ model Category {
 
   subCategories     SubCategory[]
   sites             Site[]
-  aggregateMetrics  AggregateMetrics[]
+  // aggregateMetrics  AggregateMetrics[]
   categorySummaries CategorySummary[]
 
   @@unique([regionId, slug])
@@ -264,6 +266,7 @@ model Site {
   solarData      SolarData?
   wasteData      WasteData[]
   sewageData     SewageData[]
+  communityData  CommunityData?
 
   @@unique([categoryId, slug])
   @@index([categoryId])
@@ -375,6 +378,20 @@ model SewageData {
   @@schema("core")
 }
 
+model CommunityData {
+  id        Int      @id @default(autoincrement())
+  siteId    Int      @unique
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  year      Int
+  data      Json     // e.g., {"Clean Stoves": 50, "Seeds": 200, "School Kits": 100}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("community_data")
+  @@schema("core")
+}
+
+/*
 // Aggregate Metrics - Category/Region/Organization level summaries
 model AggregateMetrics {
   id Int @id @default(autoincrement())
@@ -424,6 +441,7 @@ model AggregateMetrics {
   @@map("aggregate_metrics")
   @@schema("core")
 }
+*/
 
 // Category Summaries - Long-form text descriptions
 model CategorySummary {
@@ -579,6 +597,7 @@ enum PhotoCategory {
   EVENT // Tree planting, training, community events
   SITE // Site overview, infrastructure photos
   SPECIES // Reference images for tree species
+  COMMUNITY // Community initiative photos
 
   @@schema("spatial")
 }

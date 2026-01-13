@@ -18,8 +18,8 @@ import { VectorsModule } from './modules/vectors/vectors.module';
 import { HierarchyModule } from './modules/hierarchy/hierarchy.module';
 import { SpeciesModule } from './modules/species/species.module';
 import { PhotosModule } from './modules/photos/photos.module';
-import { AggregateMetricsModule } from './modules/aggregate-metrics/aggregate-metrics.module';
 import { CategorySummariesModule } from './modules/category-summaries/category-summaries.module';
+import { CommunityDataModule } from './modules/community-data/community-data.module';
 import { PlantationDataModule } from './modules/plantation-data/plantation-data.module';
 import { SolarDataModule } from './modules/solar-data/solar-data.module';
 import { WasteDataModule } from './modules/waste-data/waste-data.module';
@@ -65,12 +65,12 @@ import { TileCacheModule } from './modules/tile-cache/tile-cache.module';
     HierarchyModule,
     SpeciesModule,
     PhotosModule,
-    AggregateMetricsModule,
     CategorySummariesModule,
     PlantationDataModule,
     SolarDataModule,
     WasteDataModule,
     SewageDataModule,
+    CommunityDataModule,
     SiteSpeciesModule,
     TileCacheModule,
   ],

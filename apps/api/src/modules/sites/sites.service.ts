@@ -166,6 +166,11 @@ export class SitesService {
           },
         },
         yearlyMetrics: includeMetrics ? true : false,
+        plantationData: true,
+        solarData: true,
+        wasteData: true,
+        sewageData: true,
+        communityData: true,
         _count: {
           select: {
             siteBoundaries: true,
