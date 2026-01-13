@@ -6,6 +6,7 @@ export enum PhotoCategory {
   EVENT = 'EVENT',
   SITE = 'SITE',
   SPECIES = 'SPECIES',
+  COMMUNITY = 'COMMUNITY',
 }
 
 export class UploadPhotoDto {

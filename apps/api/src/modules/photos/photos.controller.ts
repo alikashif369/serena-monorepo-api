@@ -36,12 +36,12 @@ export class PhotosController {
       properties: {
         category: {
           type: 'string',
-          enum: ['EVENT', 'SITE', 'SPECIES'],
+          enum: ['EVENT', 'SITE', 'SPECIES', 'COMMUNITY'],
           description: 'Photo category',
         },
         siteId: {
           type: 'integer',
-          description: 'Site ID (required for EVENT/SITE)',
+          description: 'Site ID (required for EVENT/SITE/COMMUNITY)',
         },
         speciesId: {
           type: 'integer',
