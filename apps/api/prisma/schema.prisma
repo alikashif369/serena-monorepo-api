@@ -352,9 +352,35 @@ model WasteData {
   siteId           Int
   site             Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
   year             Int
-  organicWaste     Float
-  compostReceived  Float
-  methaneRecovered Float?
+  
+  // Weight measurements (in tonnes)
+  organicWaste     Float    // Total organic waste processed
+  inorganicWaste   Float?   // Inorganic/recyclable waste
+  rawMeatWaste     Float?   // Raw meat waste
+  totalWaste       Float?   // Total waste if different from sum
+  
+  // Compost & Recovery
+  compostReceived  Float    // Compost produced/received
+  compostQuality   String?  // Quality grade (e.g., "Grade A", "Premium")
+  recoveryRatio    Float?   // Recovery ratio percentage
+  
+  // Environmental Impact
+  methaneRecovered Float?   // Methane recovered (m³ or kg)
+  methaneSaved     Float?   // Methane emissions avoided (kg CH₄ eq)
+  co2Equivalent    Float?   // CO2 equivalent saved (tonnes)
+  
+  // Processing Details
+  landfillDiverted Float?   // Amount diverted from landfill
+  recyclingRate    Float?   // Percentage recycled
+  disposalMethod   String?  // Primary disposal method
+  
+  // Monthly breakdown (optional JSON for detailed tracking)
+  monthlyData      Json?    // {"jan": {"organic": 10, "inorganic": 2}, "feb": {...}, ...}
+  
+  // Notes and metadata
+  notes            String?
+  dataSource       String?  // Where the data came from
+  
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
