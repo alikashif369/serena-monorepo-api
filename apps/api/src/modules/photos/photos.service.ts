@@ -195,14 +195,23 @@ export class PhotosService {
 
   async remove(id: number) {
     const photo = await this.findOne(id);
-    
-    // Delete from MinIO
-    await this.minio.deleteFile(this.minio.buckets.photos, photo.minioKey);
-    
-    // Soft delete in database
-    return this.prisma.photo.update({
+
+    // Attempt to delete from MinIO (non-blocking - log errors but don't fail)
+    try {
+      await this.minio.deleteFile(this.minio.buckets.photos, photo.minioKey);
+      console.log(`✅ Deleted photo from MinIO: ${photo.minioKey}`);
+    } catch (error) {
+      // Log error but continue with database deletion
+      console.warn(`⚠️ Failed to delete photo from MinIO (${photo.minioKey}):`, error.message);
+      console.warn('Continuing with database soft delete...');
+    }
+
+    // Soft delete in database (always happens, even if MinIO delete fails)
+    const updated = await this.prisma.photo.update({
       where: { id },
       data: { isActive: false },
     });
+
+    return { ...updated, fileSize: updated.fileSize.toString() };
   }
 }
