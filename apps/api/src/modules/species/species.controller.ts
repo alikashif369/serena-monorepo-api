@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiQuery, ApiConsumes, ApiResponse } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { SpeciesService } from './species.service';
 import { CreateSpeciesDto, UpdateSpeciesDto } from './dto/create-species.dto';
 
@@ -42,5 +43,28 @@ export class SpeciesController {
   @ApiParam({ name: 'id', description: 'Species ID' })
   async delete(@Param('id') id: string) {
     return this.speciesService.delete(parseInt(id));
+  }
+
+  @Post('upload-reference-image')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload species reference image to MinIO' })
+  @ApiResponse({ status: 200, description: 'Image uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file type or size' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image file (JPEG/PNG/WEBP, max 50MB)',
+        },
+      },
+    },
+  })
+  async uploadReferenceImage(@UploadedFile() file: Express.Multer.File) {
+    return this.speciesService.uploadReferenceImage(file);
   }
 }
