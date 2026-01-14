@@ -53,13 +53,14 @@ export class SpeciesService {
           englishName: dto.englishName,
           description: dto.description,
           uses: dto.uses,
+          // Required image fields
+          image1Url: dto.image1Url,
+          image2Url: dto.image2Url,
+          image3Url: dto.image3Url,
+          image4Url: dto.image4Url,
           // Optional fields
           code: dto.code || undefined,
           imagePath: dto.imagePath || undefined,
-          image1Url: dto.image1Url || undefined,
-          image2Url: dto.image2Url || undefined,
-          image3Url: dto.image3Url || undefined,
-          image4Url: dto.image4Url || undefined,
         },
       });
     } catch (error) {

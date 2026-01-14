@@ -645,11 +645,11 @@ model Species {
   description String @db.Text
   uses        String @db.Text
 
-  // Reference images (4 standard views)
-  image1Url String? // Habitat view
-  image2Url String? // Leaf close-up
-  image3Url String? // Bark texture
-  image4Url String? // Seed/flower
+  // Reference images (4 standard views) - ALL REQUIRED
+  image1Url String  // Habitat view - REQUIRED
+  image2Url String  // Leaf close-up - REQUIRED
+  image3Url String  // Bark texture - REQUIRED
+  image4Url String  // Seed/flower - REQUIRED
   imagePath String? // Legacy single image path
 
   // Relations

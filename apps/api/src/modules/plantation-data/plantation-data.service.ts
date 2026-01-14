@@ -164,13 +164,21 @@ export class PlantationDataService {
   private async syncSpeciesToSite(siteId: number, speciesCodes: string[], totalPlants: number) {
     if (!speciesCodes || speciesCodes.length === 0) return;
 
-    // Find species by codes
+    // Find species by codes (case-insensitive, flexible matching)
     const speciesList = await this.prisma.species.findMany({
       where: {
-        OR: [
-          { code: { in: speciesCodes } },
-          { scientificName: { in: speciesCodes } },
-        ],
+        OR: speciesCodes.flatMap(code => [
+          // Exact match on code
+          { code: { equals: code, mode: 'insensitive' } },
+          // Exact match on scientificName
+          { scientificName: { equals: code, mode: 'insensitive' } },
+          // Exact match on englishName
+          { englishName: { equals: code, mode: 'insensitive' } },
+          // Exact match on localName
+          { localName: { equals: code, mode: 'insensitive' } },
+          // Partial match (contains) on scientificName
+          { scientificName: { contains: code, mode: 'insensitive' } },
+        ]),
       },
     });
 

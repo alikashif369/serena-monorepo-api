@@ -70,40 +70,44 @@ export class CreateSpeciesDto {
   imagePath?: string;
 
   @ApiProperty({
-    description: 'Image 1 URL (Habitat view)',
+    description: 'Image 1 URL (Habitat view) - REQUIRED',
     example: 'https://example.com/habitat.jpg',
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  image1Url?: string;
+  @IsNotEmpty()
+  @IsUrl()
+  image1Url: string;
 
   @ApiProperty({
-    description: 'Image 2 URL (Leaf close-up)',
+    description: 'Image 2 URL (Leaf close-up) - REQUIRED',
     example: 'https://example.com/leaf.jpg',
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  image2Url?: string;
+  @IsNotEmpty()
+  @IsUrl()
+  image2Url: string;
 
   @ApiProperty({
-    description: 'Image 3 URL (Bark texture)',
+    description: 'Image 3 URL (Bark texture) - REQUIRED',
     example: 'https://example.com/bark.jpg',
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  image3Url?: string;
+  @IsNotEmpty()
+  @IsUrl()
+  image3Url: string;
 
   @ApiProperty({
-    description: 'Image 4 URL (Seed/flower)',
+    description: 'Image 4 URL (Seed/flower) - REQUIRED',
     example: 'https://example.com/flower.jpg',
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  image4Url?: string;
+  @IsNotEmpty()
+  @IsUrl()
+  image4Url: string;
 }
 
 export class UpdateSpeciesDto {
