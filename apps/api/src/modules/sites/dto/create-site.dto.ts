@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsNotEmpty,
   ValidateNested,
+  Matches,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -41,10 +42,13 @@ export class CreateSiteDto {
 
   @ApiProperty({
     example: 'ranga-plantation',
-    description: 'URL-friendly slug (must be unique within category)',
+    description: 'URL-friendly slug (must be unique within category, lowercase alphanumeric with hyphens only)',
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[a-z0-9-]+$/, {
+    message: 'Slug must contain only lowercase letters, numbers, and hyphens',
+  })
   slug: string;
 
   @ApiProperty({

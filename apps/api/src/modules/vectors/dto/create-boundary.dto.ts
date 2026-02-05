@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNumber, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
+import { IsValidGeoJSON } from '../../../common/validators/geojson.validator';
 
 export class CreateBoundaryDto {
   @ApiProperty({
@@ -33,7 +34,7 @@ export class CreateBoundaryDto {
       ],
     },
   })
-  @IsObject()
+  @IsValidGeoJSON()
   @IsNotEmpty()
   geometry: any;
 
@@ -64,7 +65,7 @@ export class UpdateBoundaryDto {
     },
     required: false,
   })
-  @IsObject()
+  @IsValidGeoJSON()
   @IsOptional()
   geometry?: any;
 

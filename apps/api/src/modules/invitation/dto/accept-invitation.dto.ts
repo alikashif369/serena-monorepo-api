@@ -22,7 +22,7 @@ export class AcceptInvitationDto {
     description: 'Password for the new account (min 8 characters, must include uppercase, lowercase, number, and special character)',
   })
   @IsString()
-  @MinLength(12, { message: 'Password must be at least 8 characters long' })
+  @MinLength(8, { message: 'Password must be at least 8 characters long' })
   @Matches(
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+=\-\[\]{}|;:',.<>\/~`])[A-Za-z\d@$!%*?&#^()_+=\-\[\]{}|;:',.<>\/~`]{8,}$/,
     {

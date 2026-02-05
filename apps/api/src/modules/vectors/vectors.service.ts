@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -36,8 +36,12 @@ export class VectorsService {
         `;
         console.log("[VECTOR] PostGIS geom updated for boundary (SRID=4326):", created.id);
       } catch (geoErr) {
-        console.warn("[VECTOR] PostGIS update failed (non-critical):", geoErr);
-        // Continue anyway - JSON geometry is stored and usable
+        // Rollback: delete the created boundary record
+        await this.prisma.siteBoundary.delete({ where: { id: created.id } });
+        console.error("[VECTOR] PostGIS update failed, boundary rolled back:", geoErr);
+        throw new BadRequestException(
+          'Failed to save boundary geometry. The geometry may be invalid or PostGIS extension may not be available.',
+        );
       }
 
       return this.findOne(created.id);
@@ -155,7 +159,10 @@ export class VectorsService {
           WHERE id = ${id};
         `;
       } catch (geoErr) {
-        console.warn("[VECTOR] PostGIS update failed on update (non-critical):", geoErr);
+        console.error("[VECTOR] PostGIS update failed on update:", geoErr);
+        throw new BadRequestException(
+          'Failed to update boundary geometry. The geometry may be invalid or PostGIS extension may not be available.',
+        );
       }
     }
 

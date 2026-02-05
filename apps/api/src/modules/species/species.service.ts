@@ -98,26 +98,42 @@ export class SpeciesService {
       const botanicalName = dto.botanicalName || dto.scientificName;
 
       if (!scientificName) {
-        throw new Error('Scientific name is required');
+        throw new BadRequestException('Scientific name is required');
       }
 
-      return await this.prisma.species.create({
-        data: {
-          scientificName,
-          botanicalName,
-          localName: dto.localName,
-          englishName: dto.englishName,
-          description: dto.description,
-          uses: dto.uses,
-          // Required image fields
-          image1Url: dto.image1Url,
-          image2Url: dto.image2Url,
-          image3Url: dto.image3Url,
-          image4Url: dto.image4Url,
-          // Optional fields
-          code: dto.code || undefined,
-          imagePath: dto.imagePath || undefined,
-        },
+      // Validate all 4 required images are provided
+      const missingImages: string[] = [];
+      if (!dto.image1Url) missingImages.push('Image 1 (Habitat view)');
+      if (!dto.image2Url) missingImages.push('Image 2 (Leaf close-up)');
+      if (!dto.image3Url) missingImages.push('Image 3 (Bark texture)');
+      if (!dto.image4Url) missingImages.push('Image 4 (Seed/flower)');
+
+      if (missingImages.length > 0) {
+        throw new BadRequestException(
+          `Species creation requires all 4 reference images. Missing: ${missingImages.join(', ')}`
+        );
+      }
+
+      // Wrap in transaction for consistency and future extensibility
+      return await this.prisma.$transaction(async (prisma) => {
+        return await prisma.species.create({
+          data: {
+            scientificName,
+            botanicalName,
+            localName: dto.localName,
+            englishName: dto.englishName,
+            description: dto.description,
+            uses: dto.uses,
+            // Required image fields
+            image1Url: dto.image1Url,
+            image2Url: dto.image2Url,
+            image3Url: dto.image3Url,
+            image4Url: dto.image4Url,
+            // Optional fields
+            code: dto.code || undefined,
+            imagePath: dto.imagePath || undefined,
+          },
+        });
       });
     } catch (error) {
       if (error.code === 'P2002') {

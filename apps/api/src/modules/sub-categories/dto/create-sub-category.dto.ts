@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateSubCategoryDto {
@@ -9,10 +9,13 @@ export class CreateSubCategoryDto {
 
   @ApiProperty({
     example: 'organic-plantations',
-    description: 'URL-friendly slug (must be unique within category)',
+    description: 'URL-friendly slug (must be unique within category, lowercase alphanumeric with hyphens only)',
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[a-z0-9-]+$/, {
+    message: 'Slug must contain only lowercase letters, numbers, and hyphens',
+  })
   slug: string;
 
   @ApiProperty({

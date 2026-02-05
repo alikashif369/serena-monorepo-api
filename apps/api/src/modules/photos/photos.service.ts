@@ -93,39 +93,75 @@ export class PhotosService {
       size: file.size 
     });
 
-    // Upload to MinIO photos bucket
-    const minioUrl = await this.minio.uploadPhoto(fileKey, file.buffer, file.mimetype, {
-      'original-name': file.originalname,
-      'uploaded-by': String(userId || 'anonymous'),
-      'category': dto.category,
-    });
+    // Upload to MinIO first, then wrap DB operations in transaction
+    let minioUrl: string;
+    let minioUploaded = false;
 
-    // Create Photo record
-    const photo = await this.prisma.photo.create({
-      data: {
-        fileName: `${timestamp}.${extension}`,
-        originalFileName: file.originalname,
-        fileSize: BigInt(file.size),
-        mimeType: file.mimetype,
-        minioUrl,
-        minioKey: fileKey,
-        category: dto.category as any,
-        siteId: dto.siteId,
-        speciesId: dto.speciesId,
-        year: dto.year,
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        caption: dto.caption,
-        description: dto.description,
-        tags: dto.tags || [],
-        uploadedById: userId,
-      },
-    });
+    try {
+      minioUrl = await this.minio.uploadPhoto(fileKey, file.buffer, file.mimetype, {
+        'original-name': file.originalname,
+        'uploaded-by': String(userId || 'anonymous'),
+        'category': dto.category,
+      });
+      minioUploaded = true;
+      console.log('MinIO photo upload successful:', minioUrl);
+    } catch (minioError) {
+      console.error('MinIO photo upload failed:', minioError);
+      throw new BadRequestException(
+        `Failed to upload file to storage: ${minioError.message}`
+      );
+    }
 
-    return {
-      ...photo,
-      fileSize: photo.fileSize.toString(),
-    };
+    // Wrap DB operations in a transaction to ensure atomicity
+    try {
+      const photo = await this.prisma.$transaction(async (prisma) => {
+        // Create Photo record only after successful MinIO upload
+        const createdPhoto = await prisma.photo.create({
+          data: {
+            fileName: `${timestamp}.${extension}`,
+            originalFileName: file.originalname,
+            fileSize: BigInt(file.size),
+            mimeType: file.mimetype,
+            minioUrl,
+            minioKey: fileKey,
+            category: dto.category as any,
+            siteId: dto.siteId,
+            speciesId: dto.speciesId,
+            year: dto.year,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            caption: dto.caption,
+            description: dto.description,
+            tags: dto.tags || [],
+            uploadedById: userId,
+          },
+        });
+
+        return createdPhoto;
+      });
+
+      return {
+        ...photo,
+        fileSize: photo.fileSize.toString(),
+      };
+    } catch (dbError) {
+      // If DB transaction fails, clean up the uploaded file from MinIO
+      if (minioUploaded) {
+        console.error('Database transaction failed, cleaning up MinIO file:', fileKey);
+        try {
+          await this.minio.deleteFile(this.minio.buckets.photos, fileKey);
+          console.log('✓ Successfully cleaned up MinIO file after DB failure');
+        } catch (cleanupError) {
+          console.error('✗ Failed to clean up MinIO file after DB failure:', cleanupError);
+          // Don't throw - we want the original DB error to be thrown
+        }
+      }
+
+      console.error('Photo upload transaction failed:', dbError);
+      throw new BadRequestException(
+        `Failed to save photo record: ${dbError.message}`
+      );
+    }
   }
 
   async findAll(filters: {

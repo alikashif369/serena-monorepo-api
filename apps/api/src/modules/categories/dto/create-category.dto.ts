@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsNotEmpty, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, IsEnum, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CategoryType } from '@prisma/client';
 
@@ -10,10 +10,13 @@ export class CreateCategoryDto {
 
   @ApiProperty({
     example: 'plantation-sites',
-    description: 'URL-friendly slug (must be unique within region)',
+    description: 'URL-friendly slug (must be unique within region, lowercase alphanumeric with hyphens only)',
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[a-z0-9-]+$/, {
+    message: 'Slug must contain only lowercase letters, numbers, and hyphens',
+  })
   slug: string;
 
   @ApiProperty({

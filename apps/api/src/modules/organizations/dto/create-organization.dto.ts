@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateOrganizationDto {
@@ -12,10 +12,13 @@ export class CreateOrganizationDto {
 
   @ApiProperty({
     example: 'serena-hotels-group',
-    description: 'URL-friendly slug (must be unique)',
+    description: 'URL-friendly slug (must be unique, lowercase alphanumeric with hyphens only)',
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[a-z0-9-]+$/, {
+    message: 'Slug must contain only lowercase letters, numbers, and hyphens',
+  })
   slug: string;
 
   @ApiProperty({

@@ -41,25 +41,89 @@ export class RastersService {
       throw new NotFoundException(`Site with ID ${siteId} not found`);
     }
 
+    // Check for duplicate raster (same site + year + isClassified)
+    const existingRaster = await this.prisma.raster.findFirst({
+      where: {
+        siteId,
+        year,
+        isClassified,
+      },
+    });
+
+    if (existingRaster) {
+      throw new BadRequestException(
+        `A ${isClassified ? 'classified' : 'base'} raster for site "${site.name}" (year ${year}) already exists. ` +
+        `Please delete the existing raster (ID: ${existingRaster.id}) before uploading a new one.`
+      );
+    }
+
     // Generate MinIO path
     const timestamp = Date.now();
     const fileName = `${site.slug}_${year}_${isClassified ? 'classified' : 'base'}_${timestamp}${fileExtension}`;
     const minioKey = `sites/${site.slug}/${year}/${fileName}`;
 
-    console.log('Uploading to MinIO:', { 
-      isClassified, 
-      fileKey: minioKey, 
-      size: file.size 
+    console.log('Uploading to MinIO:', {
+      isClassified,
+      fileKey: minioKey,
+      size: file.size
     });
 
-    let minioUrl: string;
-    let raster: any;
+    // Extract metadata from GeoTIFF before transaction
+    let metadata: { width?: number; height?: number; bandCount?: number; bbox?: number[] } = {};
+    let metadataExtractionFailed = false;
+    let metadataError: string | null = null;
 
     try {
-      // Upload to MinIO with correct bucket routing
+      // Convert Buffer to ArrayBuffer (geotiff expects pure ArrayBuffer)
+      const arrayBuffer = file.buffer.buffer.slice(
+        file.buffer.byteOffset,
+        file.buffer.byteOffset + file.buffer.byteLength
+      ) as ArrayBuffer;
+
+      const tiff = await fromArrayBuffer(arrayBuffer);
+      const image = await tiff.getImage();
+
+      metadata = {
+        width: image.getWidth(),
+        height: image.getHeight(),
+        bandCount: image.getSamplesPerPixel(),
+      };
+
+      // Extract bounding box if available
+      const bbox = image.getBoundingBox();
+      if (bbox) {
+        metadata.bbox = bbox; // [minX, minY, maxX, maxY]
+      }
+
+      console.log('✓ Extracted GeoTIFF metadata successfully:', metadata);
+    } catch (error) {
+      metadataExtractionFailed = true;
+      metadataError = error.message;
+
+      // Enhanced error logging for better observability
+      console.error('✗ GeoTIFF metadata extraction FAILED:', {
+        fileName: file.originalname,
+        fileSize: file.size,
+        siteId,
+        year,
+        error: error.message,
+        errorStack: error.stack,
+        note: 'Upload will continue with NULL metadata. File may be corrupt or invalid GeoTIFF format.'
+      });
+
+      // Continue with null metadata - upload succeeds but metadata fields will be NULL
+      // Can be extracted later via background job or manual re-upload
+    }
+
+    // Upload to MinIO first, then wrap DB operations in transaction
+    let minioUrl: string;
+    let minioUploaded = false;
+    const bucket = isClassified ? this.minio.buckets.rastersClassified : this.minio.buckets.rastersBase;
+
+    try {
       minioUrl = await this.minio.uploadRaster(
-        minioKey, 
-        file.buffer, 
+        minioKey,
+        file.buffer,
         isClassified,
         {
           'original-name': file.originalname,
@@ -67,41 +131,21 @@ export class RastersService {
           'year': String(year),
         }
       );
-
+      minioUploaded = true;
       console.log('MinIO upload successful:', minioUrl);
+    } catch (minioError) {
+      console.error('MinIO upload failed:', minioError);
+      throw new BadRequestException(
+        `Failed to upload file to storage: ${minioError.message}`
+      );
+    }
 
-      // Extract metadata from GeoTIFF
-      let metadata: { width?: number; height?: number; bandCount?: number; bbox?: number[] } = {};
-      try {
-        // Convert Buffer to ArrayBuffer (geotiff expects pure ArrayBuffer)
-        const arrayBuffer = file.buffer.buffer.slice(
-          file.buffer.byteOffset,
-          file.buffer.byteOffset + file.buffer.byteLength
-        ) as ArrayBuffer;
-        
-        const tiff = await fromArrayBuffer(arrayBuffer);
-        const image = await tiff.getImage();
-        
-        metadata = {
-          width: image.getWidth(),
-          height: image.getHeight(),
-          bandCount: image.getSamplesPerPixel(),
-        };
-        
-        // Extract bounding box if available
-        const bbox = image.getBoundingBox();
-        if (bbox) {
-          metadata.bbox = bbox; // [minX, minY, maxX, maxY]
-        }
-        
-        console.log('Extracted GeoTIFF metadata:', metadata);
-      } catch (metadataError) {
-        console.warn('Failed to extract GeoTIFF metadata:', metadataError.message);
-        // Continue with null metadata - can be extracted later via background job
-      }
+    // Wrap DB operations in a transaction to ensure atomicity
+    try {
+      const raster = await this.prisma.$transaction(async (prisma) => {
 
-      // Create Raster record only after successful MinIO upload
-      raster = await this.prisma.raster.create({
+        // Step 2: Create DB record only after successful MinIO upload
+        const createdRaster = await prisma.raster.create({
         data: {
           siteId,
           year,
@@ -128,44 +172,57 @@ export class RastersService {
           } as any : Prisma.JsonNull,
         },
       });
-    } catch (error) {
-      console.error('Upload failed:', error);
-      // If database record was created but MinIO upload failed, clean up
-      if (raster?.id) {
-        await this.prisma.raster.delete({ where: { id: raster.id } }).catch(() => {});
+
+      // Step 3: Link to YearlyMetrics within the same transaction
+      const yearlyMetrics = await prisma.yearlyMetrics.findFirst({
+        where: { siteId, year },
+      });
+
+      if (yearlyMetrics) {
+        await prisma.yearlyMetrics.update({
+          where: { id: yearlyMetrics.id },
+          data: isClassified
+            ? { classifiedRasterId: createdRaster.id }
+            : { baseRasterId: createdRaster.id },
+        });
+      } else {
+        // Create new YearlyMetrics record
+        await prisma.yearlyMetrics.create({
+          data: {
+            siteId,
+            year,
+            ...(isClassified
+              ? { classifiedRasterId: createdRaster.id }
+              : { baseRasterId: createdRaster.id }),
+          },
+        });
       }
-      throw error;
-    }
 
-    // Link to YearlyMetrics
-    const yearlyMetrics = await this.prisma.yearlyMetrics.findFirst({
-      where: { siteId, year },
-    });
-
-    if (yearlyMetrics) {
-      await this.prisma.yearlyMetrics.update({
-        where: { id: yearlyMetrics.id },
-        data: isClassified
-          ? { classifiedRasterId: raster.id }
-          : { baseRasterId: raster.id },
+        return createdRaster;
       });
-    } else {
-      // Create new YearlyMetrics record
-      await this.prisma.yearlyMetrics.create({
-        data: {
-          siteId,
-          year,
-          ...(isClassified
-            ? { classifiedRasterId: raster.id }
-            : { baseRasterId: raster.id }),
-        },
-      });
-    }
 
-    return {
-      ...raster,
-      fileSize: raster.fileSize.toString(), // Convert BigInt to string for JSON serialization
-    };
+      return {
+        ...raster,
+        fileSize: raster.fileSize.toString(), // Convert BigInt to string for JSON serialization
+        ...(metadataExtractionFailed && {
+          warning: 'Raster uploaded successfully, but metadata extraction failed. Metadata fields (width, height, bandCount, bbox) are NULL. File may be corrupt or invalid GeoTIFF format.',
+          metadataError: metadataError,
+        }),
+      };
+    } catch (transactionError) {
+      // If transaction fails but MinIO upload succeeded, clean up the orphaned file
+      if (minioUploaded) {
+        console.error('Transaction failed, cleaning up MinIO file:', minioKey);
+        try {
+          await this.minio.deleteFile(bucket, minioKey);
+          console.log('MinIO cleanup successful');
+        } catch (cleanupError) {
+          console.error('MinIO cleanup failed:', cleanupError);
+          // Log but don't throw - the main error is more important
+        }
+      }
+      throw transactionError;
+    }
   }
 
   async findAll(query?: any) {
@@ -300,9 +357,9 @@ export class RastersService {
     console.log('🎨 TiTiler URL:', tileUrl);
     
     try {
-      // Fetch tile from TiTiler
+      // Fetch tile from TiTiler with 30-second timeout
       console.log('🚀 Fetching from TiTiler...');
-      const response = await fetch(tileUrl);
+      const response = await this.fetchWithTimeout(tileUrl, 30000);
       console.log(`📥 TiTiler response: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
@@ -341,7 +398,7 @@ export class RastersService {
           const tileUrl2 = `${titilerUrl}/cog/tiles/WebMercatorQuad/${z}/${x}/${y}.png?url=${encodeURIComponent(presigned)}&bidx=1&bidx=2&bidx=3&rescale=0,255&minzoom=0&maxzoom=24&resampling_method=bilinear&return_mask=true`;
           console.log('🔁 Retrying TiTiler with presigned URL');
 
-          const resp2 = await fetch(tileUrl2);
+          const resp2 = await this.fetchWithTimeout(tileUrl2, 30000);
           if (!resp2.ok) {
             const err2 = await resp2.text();
             // Check for bounds error on retry too
@@ -536,5 +593,25 @@ export class RastersService {
     }
 
     return { message: `Raster ${id} deleted successfully` };
+  }
+
+  /**
+   * Helper: Fetch with timeout to prevent hanging requests
+   */
+  private async fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs}ms`);
+      }
+      throw error;
+    }
   }
 }

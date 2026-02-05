@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiQuery, ApiConsumes, ApiRes
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SpeciesService } from './species.service';
 import { CreateSpeciesDto, UpdateSpeciesDto } from './dto/create-species.dto';
+import { QuerySpeciesDto } from './dto/query-species.dto';
 
 @ApiTags('Species')
 @Controller('species')
@@ -11,8 +12,7 @@ export class SpeciesController {
 
   @Get()
   @ApiOperation({ summary: 'List all species with optional search' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search by code, botanical name, or local name' })
-  async findAll(@Query() query: any) {
+  async findAll(@Query() query: QuerySpeciesDto) {
     return this.speciesService.findAll(query);
   }
 

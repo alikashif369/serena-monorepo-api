@@ -21,6 +21,7 @@ import {
 import { SitesService } from './sites.service';
 import { CreateSiteDto } from './dto/create-site.dto';
 import { UpdateSiteDto } from './dto/update-site.dto';
+import { QuerySitesDto } from './dto/query-sites.dto';
 import { JwtAuthGuard } from '@app/shared-config/authentication';
 
 @ApiTags('Sites')
@@ -55,10 +56,7 @@ export class SitesController {
 
   @Get()
   @ApiOperation({ summary: 'List all sites with optional filters' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search by name, slug, district, or city' })
-  @ApiQuery({ name: 'categoryId', required: false, description: 'Filter by category ID', type: Number })
-  @ApiQuery({ name: 'siteType', required: false, description: 'Filter by site type' })
-  async findAll(@Query() query: any) {
+  async findAll(@Query() query: QuerySitesDto) {
     return this.sitesService.findAll(query);
   }
 

@@ -8,8 +8,8 @@ export class CreateCommunityDataDto {
 
   @ApiProperty({ description: 'The year of reporting', example: 2024 })
   @IsInt()
-  @Min(2019)
-  @Max(2100)
+  @Min(2000, { message: 'Year must be between 2000 and 2100' })
+  @Max(2100, { message: 'Year must be between 2000 and 2100' })
   year: number;
 
   @ApiProperty({
