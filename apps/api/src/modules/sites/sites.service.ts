@@ -230,7 +230,7 @@ export class SitesService {
       if (updateSiteDto.siteType) updateData.siteType = updateSiteDto.siteType;
       if (updateSiteDto.infrastructure !== undefined) updateData.infrastructure = updateSiteDto.infrastructure;
 
-      return await this.prisma.site.update({
+      const result = await this.prisma.site.update({
         where: { id },
         data: updateData,
         include: {
@@ -242,6 +242,8 @@ export class SitesService {
           },
         },
       });
+      this.hierarchyService.invalidateCache();
+      return result;
     } catch (error) {
       if (error.code === 'P2002') {
         throw new ConflictException(
@@ -335,6 +337,7 @@ export class SitesService {
       return deletedSite;
     });
 
+    this.hierarchyService.invalidateCache();
     return result;
   }
 

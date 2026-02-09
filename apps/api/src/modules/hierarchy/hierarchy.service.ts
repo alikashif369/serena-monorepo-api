@@ -19,16 +19,21 @@ export class HierarchyService {
     }
 
     console.log("[HIERARCHY_SERVICE] Building new tree from database");
-    // Build full hierarchy tree
+    // Build full hierarchy tree - filter out soft-deleted records at ALL levels
     const organizations = await this.prisma.organization.findMany({
+      where: { deletedAt: null },
       include: {
         regions: {
+          where: { deletedAt: null },
           include: {
             categories: {
+              where: { deletedAt: null },
               include: {
                 subCategories: {
+                  where: { deletedAt: null },
                   include: {
                     sites: {
+                      where: { deletedAt: null },
                       select: {
                         id: true,
                         name: true,
@@ -50,7 +55,7 @@ export class HierarchyService {
                   orderBy: { name: 'asc' },
                 },
                 sites: {
-                  where: { subCategoryId: null },
+                  where: { subCategoryId: null, deletedAt: null },
                   select: {
                     id: true,
                     name: true,

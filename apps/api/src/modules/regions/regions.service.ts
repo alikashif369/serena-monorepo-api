@@ -137,7 +137,7 @@ export class RegionsService {
     }
 
     try {
-      return await this.prisma.region.update({
+      const result = await this.prisma.region.update({
         where: { id },
         data: {
           ...(updateRegionDto.name && { name: updateRegionDto.name }),
@@ -152,6 +152,8 @@ export class RegionsService {
           },
         },
       });
+      this.hierarchyService.invalidateCache();
+      return result;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -172,7 +174,7 @@ export class RegionsService {
     }
 
     // Soft delete
-    return await this.prisma.region.update({
+    const result = await this.prisma.region.update({
       where: { id },
       data: { deletedAt: new Date() },
       include: {
@@ -181,6 +183,8 @@ export class RegionsService {
         },
       },
     });
+    this.hierarchyService.invalidateCache();
+    return result;
   }
 
   async getCategories(regionId: number) {
