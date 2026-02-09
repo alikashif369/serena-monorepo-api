@@ -165,7 +165,7 @@ export class CategoriesService {
     }
 
     try {
-      return await this.prisma.category.update({
+      const result = await this.prisma.category.update({
         where: { id },
         data: {
           ...(updateCategoryDto.name && { name: updateCategoryDto.name }),
@@ -181,6 +181,8 @@ export class CategoriesService {
           },
         },
       });
+      this.hierarchyService.invalidateCache();
+      return result;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -201,7 +203,7 @@ export class CategoriesService {
     }
 
     // Soft delete
-    return await this.prisma.category.update({
+    const result = await this.prisma.category.update({
       where: { id },
       data: { deletedAt: new Date() },
       include: {
@@ -210,6 +212,8 @@ export class CategoriesService {
         },
       },
     });
+    this.hierarchyService.invalidateCache();
+    return result;
   }
 
   async getSites(categoryId: number) {

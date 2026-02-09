@@ -150,7 +150,7 @@ export class SubCategoriesService {
     }
 
     try {
-      return await this.prisma.subCategory.update({
+      const result = await this.prisma.subCategory.update({
         where: { id },
         data: {
           ...(updateSubCategoryDto.name && { name: updateSubCategoryDto.name }),
@@ -165,6 +165,8 @@ export class SubCategoriesService {
           },
         },
       });
+      this.hierarchyService.invalidateCache();
+      return result;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -187,7 +189,7 @@ export class SubCategoriesService {
     }
 
     // Soft delete
-    return await this.prisma.subCategory.update({
+    const result = await this.prisma.subCategory.update({
       where: { id },
       data: { deletedAt: new Date() },
       include: {
@@ -196,5 +198,7 @@ export class SubCategoriesService {
         },
       },
     });
+    this.hierarchyService.invalidateCache();
+    return result;
   }
 }

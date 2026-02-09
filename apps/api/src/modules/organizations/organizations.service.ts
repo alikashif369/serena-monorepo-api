@@ -106,7 +106,7 @@ export class OrganizationsService {
     }
 
     try {
-      return await this.prisma.organization.update({
+      const result = await this.prisma.organization.update({
         where: { id },
         data: {
           ...(updateOrganizationDto.name && {
@@ -128,6 +128,8 @@ export class OrganizationsService {
           updatedAt: true,
         },
       });
+      this.hierarchyService.invalidateCache();
+      return result;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -150,7 +152,7 @@ export class OrganizationsService {
     }
 
     // Soft delete
-    return await this.prisma.organization.update({
+    const result = await this.prisma.organization.update({
       where: { id },
       data: { deletedAt: new Date() },
       select: {
@@ -160,6 +162,8 @@ export class OrganizationsService {
         deletedAt: true,
       },
     });
+    this.hierarchyService.invalidateCache();
+    return result;
   }
 
   async getHierarchy(id: number) {
