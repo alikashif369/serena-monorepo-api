@@ -76,7 +76,7 @@ export class CreateSpeciesDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   image1Url: string;
 
   @ApiProperty({
@@ -86,7 +86,7 @@ export class CreateSpeciesDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   image2Url: string;
 
   @ApiProperty({
@@ -96,7 +96,7 @@ export class CreateSpeciesDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   image3Url: string;
 
   @ApiProperty({
@@ -106,7 +106,7 @@ export class CreateSpeciesDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   image4Url: string;
 }
 
